@@ -77,11 +77,11 @@ export default function Navbar() {
               <span>Users</span>
             </Link>
             <Link 
-              href="/reports" 
+              href="/feed" 
               className="flex items-center space-x-2 text-white/90 hover:text-white"
             >
               <FileText className="h-5 w-5" />
-              <span>Reports</span>
+              <span>Feed</span>
             </Link>
             <Link 
               href="/news" 
