@@ -2,11 +2,31 @@
 
 import Link from "next/link";
 import { Search, Users, FileText, Mail, Folder, Vote, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from "@/components/ui/dropdown-menu"
+import { auth } from "@/lib/firebaseConfig";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 export default function Navbar() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/'); // Redirect to login page after logout
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full">
       <header className="bg-indigo-700 text-white">
@@ -19,9 +39,32 @@ export default function Navbar() {
               </div>
               <span className="text-xl font-semibold">CondoVoice</span>
             </div>
-            <Avatar className="h-8 w-8 bg-pink-100">
-              <AvatarFallback className="text-pink-500">L</AvatarFallback>
-            </Avatar>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
+                  <AvatarFallback className="text-pink-500">L</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Link href="/profile" className="flex items-center w-full">
+                    Profile Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/notifications" className="flex items-center w-full">
+                    Notifications
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Navigation */}
