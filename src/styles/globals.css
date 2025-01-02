@@ -4,7 +4,8 @@
 
 html,
 body {
-  overscroll-behavior: none;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -73,5 +74,12 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Add these styles to enable and style the native pull-to-refresh */
+@media (max-width: 768px) {
+  body {
+    overflow-y: auto;
   }
 }

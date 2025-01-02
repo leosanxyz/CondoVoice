@@ -25,7 +25,7 @@ export default function ProfilePage() {
   };
 
   const handleNameUpdate = async () => {
-    if (!newName.trim()) return;
+    if (!newName.trim() || !currentUser) return;
     setIsUpdating(true);
     try {
       await updateProfile(currentUser, { displayName: newName.trim() });
@@ -40,7 +40,7 @@ export default function ProfilePage() {
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !currentUser) return;
 
     setIsUpdating(true);
     const storageRef = ref(storage, `avatars/${currentUser?.uid}`);

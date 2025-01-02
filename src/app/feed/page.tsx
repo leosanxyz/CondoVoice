@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, ThumbsUp, MessageCircle, Share2 } from 'lucide-react';
+import { Plus, ThumbsUp, MessageCircle, Share2, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, updateProfile } from 'firebase/auth';
+import useSWR from 'swr';
+import { usePullToRefresh } from 'use-pull-to-refresh';
+import { Label } from '@/components/ui/label';
 
 interface Post {
   id: string;
@@ -27,12 +30,37 @@ interface Post {
 export default function FeedPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
-  const [posts, setPosts] = useState<Post[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchPosts = async () => {
+    const postsCollection = collection(db, 'posts');
+    const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+    const querySnapshot = await getDocs(postsQuery);
+
+    const postsData = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: new Date(doc.data().timestamp?.toDate()).toLocaleString(),
+    }));
+
+    return postsData.map((post: any) => ({
+      id: post.id,
+      author: post.author,
+      content: post.content,
+      timestamp: post.timestamp,
+      likes: post.likes || 0,
+      comments: post.comments || 0,
+    }));
+  };
+
+  const { data: posts, mutate } = useSWR('posts', fetchPosts, {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+  });
 
   useEffect(() => {
     const auth = getAuth();
-
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser({
@@ -40,10 +68,7 @@ export default function FeedPage() {
           name: currentUser.displayName || 'Anonymous',
           avatar: currentUser.photoURL || '/placeholder.svg',
           initials: currentUser.displayName
-            ? currentUser.displayName
-                .split(' ')
-                .map((n) => n[0])
-                .join('')
+            ? currentUser.displayName.split(' ').map((n) => n[0]).join('')
             : 'AN',
         });
       } else {
@@ -51,33 +76,20 @@ export default function FeedPage() {
       }
     });
 
-    const fetchPosts = async () => {
-      const postsCollection = collection(db, 'posts');
-      const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(postsQuery);
-
-      const postsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: new Date(doc.data().timestamp?.toDate()).toLocaleString(),
-      }));
-
-      setPosts(
-        postsData.map((post: any) => ({
-          id: post.id,
-          author: post.author,
-          content: post.content,
-          timestamp: post.timestamp,
-          likes: post.likes || 0,
-          comments: post.comments || 0,
-        }))
-      );
-    };
-
-    fetchPosts();
-
     return () => unsubscribeAuth();
   }, []);
+
+  const { isRefreshing: isPulling, pullToRefresh } = usePullToRefresh({
+    onRefresh: async () => {
+      setIsRefreshing(true);
+      try {
+        await mutate();
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    resistance: 2.5,
+  });
 
   const handleCreatePost = async () => {
     if (!user) return;
@@ -96,18 +108,8 @@ export default function FeedPage() {
     };
 
     try {
-      const docRef = await addDoc(postsCollection, newPost);
-      setPosts([
-        {
-          id: docRef.id,
-          author: newPost.author,
-          content: newPostContent,
-          timestamp: new Date().toLocaleString(),
-          likes: 0,
-          comments: 0,
-        },
-        ...posts,
-      ]);
+      await addDoc(postsCollection, newPost);
+      await mutate();
       setNewPostContent('');
       setIsDialogOpen(false);
     } catch (error) {
@@ -140,10 +142,21 @@ export default function FeedPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-2xl px-4 py-8">
-      {/* Posts Feed */}
+    <div 
+      className="container mx-auto max-w-2xl px-4 py-8"
+      {...pullToRefresh}
+    >
+      {(isRefreshing || isPulling) && (
+        <div className="fixed top-16 left-0 right-0 flex justify-center z-50">
+          <div className="bg-indigo-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Refreshing...</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
-        {posts.map((post) => (
+        {posts?.map((post) => (
           <Card key={post.id}>
             <CardHeader className="flex flex-row items-center space-x-4 p-4">
               <Avatar>
@@ -178,33 +191,63 @@ export default function FeedPage() {
         ))}
       </div>
 
-      {/* Floating Action Button */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
           <Button
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg"
+            className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg md:bottom-6"
             size="icon"
           >
             <Plus className="h-6 w-6" />
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
-            <DialogTitle>Create New Post</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">Create New Post</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <Textarea
-              placeholder="What's on your mind?"
-              value={newPostContent}
-              onChange={(e) => setNewPostContent(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <div className="flex justify-end">
-              <Button onClick={handleCreatePost} disabled={!newPostContent.trim()}>
-                Post
-              </Button>
+          <div className="mt-6">
+            <div className="flex items-start space-x-4">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={user?.avatar} />
+                <AvatarFallback>{user?.initials}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="post-content" className="sr-only">
+                  Post content
+                </Label>
+                <Textarea
+                  id="post-content"
+                  placeholder="What would you like to share?"
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  className="min-h-[120px] resize-none border-0 bg-transparent p-0 text-lg focus:ring-0"
+                />
+              </div>
             </div>
           </div>
+          <DialogFooter className="sm:justify-between">
+            <div className="flex items-center space-x-2">
+              {/* Add attachment options if needed */}
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreatePost}
+                disabled={!newPostContent.trim() || isRefreshing}
+                className="min-w-[80px]"
+              >
+                {isRefreshing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Post'
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
