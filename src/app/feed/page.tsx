@@ -8,11 +8,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, ThumbsUp, MessageCircle, Share2, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import useSWR from 'swr';
 import { usePullToRefresh } from 'use-pull-to-refresh';
 import { Label } from '@/components/ui/label';
+
+interface PollOption {
+  label: string;
+  votes: number;
+}
+
+interface Poll {
+  question: string;
+  options: PollOption[];
+  active: boolean;
+}
 
 interface Post {
   id: string;
@@ -25,6 +36,7 @@ interface Post {
   timestamp: string;
   likes: number;
   comments: number;
+  poll?: Poll;
 }
 
 export default function FeedPage() {
@@ -32,6 +44,12 @@ export default function FeedPage() {
   const [newPostContent, setNewPostContent] = useState('');
   const [user, setUser] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPoll, setIsPoll] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<PollOption[]>([
+    { label: '', votes: 0 },
+    { label: '', votes: 0 },
+  ]);
 
   const fetchPosts = async () => {
     const postsCollection = collection(db, 'posts');
@@ -51,6 +69,7 @@ export default function FeedPage() {
       timestamp: post.timestamp,
       likes: post.likes || 0,
       comments: post.comments || 0,
+      poll: post.poll || undefined
     }));
   };
 
@@ -91,11 +110,27 @@ export default function FeedPage() {
     resistance: 2.5,
   });
 
+  const addPollOption = () => {
+    setPollOptions([...pollOptions, { label: '', votes: 0 }]);
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    }
+  };
+
+  const handlePollOptionChange = (index: number, newLabel: string) => {
+    const newOptions = [...pollOptions];
+    newOptions[index].label = newLabel;
+    setPollOptions(newOptions);
+  };
+
   const handleCreatePost = async () => {
     if (!user) return;
 
     const postsCollection = collection(db, 'posts');
-    const newPost = {
+    const newPost: any = {
       author: {
         name: user.name,
         avatar: user.avatar,
@@ -107,10 +142,21 @@ export default function FeedPage() {
       comments: 0,
     };
 
+    if (isPoll && pollQuestion.trim() && pollOptions.filter(opt => opt.label.trim()).length >= 2) {
+      newPost.poll = {
+        question: pollQuestion.trim(),
+        options: pollOptions.filter(opt => opt.label.trim()),
+        active: true,
+      };
+    }
+
     try {
       await addDoc(postsCollection, newPost);
       await mutate();
       setNewPostContent('');
+      setIsPoll(false);
+      setPollQuestion('');
+      setPollOptions([{ label: '', votes: 0 }, { label: '', votes: 0 }]);
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating post:', error);
@@ -138,6 +184,47 @@ export default function FeedPage() {
       } catch (error) {
         console.error('Error updating profile:', error);
       }
+    }
+  };
+
+  const handleVote = async (postId: string, optionIndex: number) => {
+    if (!user) return;
+
+    const postRef = doc(db, 'posts', postId);
+    const voteRef = doc(db, `posts/${postId}/votes/${user.id}`);
+
+    try {
+      // Check if user has already voted
+      const voteDoc = await getDoc(voteRef);
+      if (voteDoc.exists()) {
+        return; // User has already voted
+      }
+
+      // Get current post data
+      const postDoc = await getDoc(postRef);
+      if (!postDoc.exists()) return;
+
+      const postData = postDoc.data();
+      if (!postData.poll?.options) return;
+
+      // Update vote count
+      const updatedOptions = [...postData.poll.options];
+      updatedOptions[optionIndex].votes += 1;
+
+      // Update post and record vote
+      await Promise.all([
+        updateDoc(postRef, {
+          'poll.options': updatedOptions
+        }),
+        setDoc(voteRef, {
+          optionIndex,
+          timestamp: serverTimestamp()
+        })
+      ]);
+
+      await mutate();
+    } catch (error) {
+      console.error('Error voting:', error);
     }
   };
 
@@ -170,6 +257,40 @@ export default function FeedPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-gray-700">{post.content}</p>
+              {post.poll && (
+                <div className="mt-4 space-y-4">
+                  <p className="font-semibold">{post.poll.question}</p>
+                  <div className="space-y-2">
+                    {post.poll.options.map((option: PollOption, index: number) => {
+                      const totalVotes = post.poll.options.reduce((acc: number, opt: PollOption) => acc + opt.votes, 0);
+                      const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+                      
+                      return (
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              name={`poll-${post.id}`}
+                              onChange={() => handleVote(post.id, index)}
+                              className="h-4 w-4"
+                            />
+                            <span>{option.label}</span>
+                          </div>
+                          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-600"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {option.votes} votes ({percentage.toFixed(1)}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="border-t p-4">
               <div className="flex space-x-6">
@@ -210,7 +331,7 @@ export default function FeedPage() {
                 <AvatarImage src={user?.avatar} />
                 <AvatarFallback>{user?.initials}</AvatarFallback>
               </Avatar>
-              <div className="flex-1 space-y-2">
+              <div className="flex-1 space-y-4">
                 <Label htmlFor="post-content" className="sr-only">
                   Post content
                 </Label>
@@ -221,6 +342,66 @@ export default function FeedPage() {
                   onChange={(e) => setNewPostContent(e.target.value)}
                   className="min-h-[120px] resize-none border-0 bg-transparent p-0 text-lg focus:ring-0"
                 />
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isPoll"
+                    checked={isPoll}
+                    onChange={(e) => setIsPoll(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <Label htmlFor="isPoll">Create a poll</Label>
+                </div>
+
+                {isPoll && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="poll-question">Poll Question</Label>
+                      <input
+                        type="text"
+                        id="poll-question"
+                        value={pollQuestion}
+                        onChange={(e) => setPollQuestion(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        placeholder="Ask a question..."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Options</Label>
+                      {pollOptions.map((option, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={option.label}
+                            onChange={(e) => handlePollOptionChange(index, e.target.value)}
+                            className="flex-1 rounded-md border border-gray-300 px-3 py-2"
+                            placeholder={`Option ${index + 1}`}
+                          />
+                          {pollOptions.length > 2 && (
+                            <button
+                              onClick={() => removePollOption(index)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {pollOptions.length < 6 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addPollOption}
+                          className="mt-2"
+                        >
+                          Add Option
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -237,7 +418,10 @@ export default function FeedPage() {
               </Button>
               <Button
                 onClick={handleCreatePost}
-                disabled={!newPostContent.trim() || isRefreshing}
+                disabled={
+                  (!newPostContent.trim() && !isPoll) ||
+                  (isPoll && (!pollQuestion.trim() || pollOptions.filter(opt => opt.label.trim()).length < 2))
+                }
                 className="min-w-[80px]"
               >
                 {isRefreshing ? (
