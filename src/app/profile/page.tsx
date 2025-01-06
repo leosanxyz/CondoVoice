@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Camera, Loader2 } from 'lucide-react';
 import { getAuth, updateProfile } from 'firebase/auth';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebaseConfig';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { storage, db } from '@/lib/firebaseConfig';
 
 export default function ProfilePage() {
   const auth = getAuth();
@@ -17,22 +18,50 @@ export default function ProfilePage() {
 
   const [name, setName] = useState(currentUser?.displayName || 'Anonymous');
   const [newName, setNewName] = useState('');
+  const [aptNumber, setAptNumber] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.photoURL || '/placeholder.svg');
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Load APT number on mount
+  useEffect(() => {
+    const loadAptNumber = async () => {
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          setAptNumber(userDoc.data().aptNumber || '');
+        }
+      }
+    };
+    loadAptNumber();
+  }, [currentUser]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewName(e.target.value);
   };
 
-  const handleNameUpdate = async () => {
-    if (!newName.trim() || !currentUser) return;
+  const handleAptNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAptNumber(e.target.value);
+  };
+
+  const handleProfileUpdate = async () => {
+    if (!currentUser) return;
     setIsUpdating(true);
+    
     try {
-      await updateProfile(currentUser, { displayName: newName.trim() });
-      setName(newName.trim());
-      setNewName('');
+      // Update display name if changed
+      if (newName.trim()) {
+        await updateProfile(currentUser, { displayName: newName.trim() });
+        setName(newName.trim());
+        setNewName('');
+      }
+
+      // Update APT number in Firestore
+      await setDoc(doc(db, 'users', currentUser.uid), {
+        aptNumber: aptNumber.trim(),
+      }, { merge: true });
+
     } catch (error) {
-      console.error('Error updating name:', error);
+      console.error('Error updating profile:', error);
     } finally {
       setIsUpdating(false);
     }
@@ -97,24 +126,43 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <div className="flex space-x-2">
-              <Input
-                id="name"
-                value={newName}
-                onChange={handleNameChange}
-                placeholder={name}
-              />
-              <Button onClick={handleNameUpdate} disabled={!newName.trim() || isUpdating}>
-                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update'}
-              </Button>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="name"
+                  value={newName}
+                  onChange={handleNameChange}
+                  placeholder={name}
+                />
+              </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apt">Apartment Number</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="apt"
+                  value={aptNumber}
+                  onChange={handleAptNumberChange}
+                  placeholder="Enter your apartment number"
+                />
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleProfileUpdate} 
+              disabled={(!newName.trim() && !aptNumber.trim()) || isUpdating}
+            >
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update'}
+            </Button>
           </div>
 
           <div className="pt-4">
             <h3 className="text-lg font-semibold">Current Profile Information</h3>
             <p>Name: {name}</p>
+            <p>Apartment: {aptNumber || 'Not set'}</p>
           </div>
         </CardContent>
       </Card>

@@ -31,6 +31,7 @@ interface Post {
     name: string;
     avatar: string;
     initials: string;
+    aptNumber?: string;
   };
   content: string;
   timestamp: string;
@@ -129,12 +130,16 @@ export default function FeedPage() {
   const handleCreatePost = async () => {
     if (!user) return;
 
+    const userDoc = await getDoc(doc(db, 'users', user.id));
+    const aptNumber = userDoc.exists() ? userDoc.data().aptNumber : null;
+
     const postsCollection = collection(db, 'posts');
     const newPost: any = {
       author: {
         name: user.name,
         avatar: user.avatar,
         initials: user.initials,
+        aptNumber: aptNumber || 'Not set',
       },
       content: newPostContent,
       timestamp: serverTimestamp(),
@@ -252,7 +257,11 @@ export default function FeedPage() {
               </Avatar>
               <div className="flex flex-col">
                 <span className="font-semibold">{post.author.name}</span>
-                <span className="text-sm text-gray-500">{post.timestamp}</span>
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <span>{post.timestamp}</span>
+                  <span>•</span>
+                  <span>APT {post.author.aptNumber}</span>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-4 pt-0">
