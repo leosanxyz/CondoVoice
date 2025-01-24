@@ -33,6 +33,20 @@ interface PollStats {
   polls: PollData[];
 }
 
+interface PollOption {
+  label: string;
+  votes: number;
+}
+
+interface FirebasePoll {
+  question: string;
+  options: PollOption[];
+}
+
+interface FirebasePost {
+  poll?: FirebasePoll;
+}
+
 const COLORS = ['#2563eb', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'];
 
 export default function VotesPage() {
@@ -53,10 +67,10 @@ export default function VotesPage() {
       let pollCount = 0;
 
       snapshot.docs.forEach((doc) => {
-        const post = doc.data();
+        const post = doc.data() as FirebasePost;
         if (post.poll) {
           pollCount++;
-          const pollVotes = post.poll.options.reduce((acc: number, opt: any) => acc + opt.votes, 0);
+          const pollVotes = post.poll.options.reduce((acc, opt) => acc + opt.votes, 0);
           totalVotes += pollVotes;
           
           pollsData.push({

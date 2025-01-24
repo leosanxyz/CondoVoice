@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Users, FileText, Mail, Folder, Vote, Plus } from "lucide-react";
+import { Users, FileText, Mail, Folder, Vote } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,

@@ -16,6 +16,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+interface FirebaseError {
+  code: string;
+  message: string;
+}
+
 export function LoginForm({
   className,
   ...props
@@ -32,9 +37,10 @@ export function LoginForm({
     try {
       await signInWithEmailAndPassword(auth, email, password)
       router.push("/feed")
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
-      alert("Error al iniciar sesión: " + error.message)
+      const firebaseError = error as FirebaseError;
+      alert("Error al iniciar sesión: " + firebaseError.message)
     } finally {
       setIsLoading(false)
     }

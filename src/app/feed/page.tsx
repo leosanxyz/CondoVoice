@@ -25,7 +25,14 @@ interface Poll {
   active: boolean;
 }
 
-interface Post {
+interface User {
+  id: string;
+  name: string;
+  avatar: string;
+  initials: string;
+}
+
+interface FirebasePost {
   id: string;
   author: {
     name: string;
@@ -34,7 +41,7 @@ interface Post {
     aptNumber?: string;
   };
   content: string;
-  timestamp: string;
+  timestamp: any; // Firebase Timestamp
   likes: number;
   comments: number;
   poll?: Poll;
@@ -43,7 +50,7 @@ interface Post {
 export default function FeedPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -61,17 +68,9 @@ export default function FeedPage() {
       id: doc.id,
       ...doc.data(),
       timestamp: new Date(doc.data().timestamp?.toDate()).toLocaleString(),
-    }));
+    })) as FirebasePost[];
 
-    return postsData.map((post: any) => ({
-      id: post.id,
-      author: post.author,
-      content: post.content,
-      timestamp: post.timestamp,
-      likes: post.likes || 0,
-      comments: post.comments || 0,
-      poll: post.poll || undefined
-    }));
+    return postsData;
   };
 
   const { data: posts, mutate } = useSWR('posts', fetchPosts, {
@@ -168,30 +167,6 @@ export default function FeedPage() {
     }
   };
 
-  const handleProfileUpdate = async (newName: string, newAvatarUrl: string) => {
-    const auth = getAuth();
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      try {
-        await updateProfile(currentUser, {
-          displayName: newName,
-          photoURL: newAvatarUrl,
-        });
-        setUser({
-          ...user,
-          name: newName,
-          avatar: newAvatarUrl,
-          initials: newName
-            .split(' ')
-            .map((n) => n[0])
-            .join(''),
-        });
-      } catch (error) {
-        console.error('Error updating profile:', error);
-      }
-    }
-  };
-
   const handleVote = async (postId: string, optionIndex: number) => {
     if (!user) return;
 
@@ -270,33 +245,41 @@ export default function FeedPage() {
                 <div className="mt-4 space-y-4">
                   <p className="font-semibold">{post.poll.question}</p>
                   <div className="space-y-2">
-                    {post.poll.options.map((option: PollOption, index: number) => {
-                      const totalVotes = post.poll.options.reduce((acc: number, opt: PollOption) => acc + opt.votes, 0);
-                      const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
-                      
-                      return (
-                        <div key={index} className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              name={`poll-${post.id}`}
-                              onChange={() => handleVote(post.id, index)}
-                              className="h-4 w-4"
-                            />
-                            <span>{option.label}</span>
-                          </div>
-                          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-indigo-600"
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {option.votes} votes ({percentage.toFixed(1)}%)
-                          </div>
-                        </div>
-                      );
-                    })}
+                  {post.poll && (
+  <div className="mt-4 space-y-4">
+    <p className="font-semibold">{post.poll.question}</p>
+    <div className="space-y-2">
+      {post.poll.options.map((option: PollOption, index: number) => {
+        const totalVotes = post.poll.options.reduce((acc: number, opt: PollOption) => acc + opt.votes, 0);
+        const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+
+        return (
+          <div key={index} className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                name={`poll-${post.id}`}
+                onChange={() => handleVote(post.id, index)}
+                className="h-4 w-4"
+              />
+              <span>{option.label}</span>
+            </div>
+            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-600"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            <div className="text-sm text-gray-500">
+              {option.votes} votes ({percentage.toFixed(1)}%)
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+
                   </div>
                 </div>
               )}

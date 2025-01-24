@@ -7,6 +7,11 @@ import { auth } from "@/lib/firebaseConfig";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
+interface FirebaseError {
+  code: string;
+  message: string;
+}
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -37,9 +42,10 @@ export default function RegisterPage() {
 
       alert("¡Usuario registrado!");
       router.push("/"); // vuelve al login o directo a /feed, tú decides
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      alert("Error al registrarse");
+      const firebaseError = error as FirebaseError;
+      alert("Error al registrarse: " + firebaseError.message);
     }
   }
 
