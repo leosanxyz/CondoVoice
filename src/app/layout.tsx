@@ -1,5 +1,6 @@
 import "@/styles/globals.css"; // o tu archivo global de Tailwind
 import Navbar from "@/components/Navbar";
+import AuthGuard from "@/components/auth-guard";
 
 export const metadata = {
   title: "CondoVoice",
@@ -15,11 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans">
-        {/* Renderiza el Navbar en todas las páginas */}
-        <Navbar />
-        
-        {/* Contenido específico de cada página (app/page.tsx, etc.) */}
-        <main>{children}</main>
+        <AuthGuard>
+          <Navbar />
+          <main>{children}</main>
+        </AuthGuard>
       </body>
     </html>
   );

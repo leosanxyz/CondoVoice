@@ -13,10 +13,17 @@ import {
   } from "@/components/ui/dropdown-menu"
 import { auth } from "@/lib/firebaseConfig";
 import { signOut } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Hide navbar on these routes
+  const hiddenRoutes = ['/', '/register'];
+  if (hiddenRoutes.includes(pathname)) {
+    return null;
+  }
 
   const handleLogout = async () => {
     try {
