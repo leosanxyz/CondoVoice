@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Users, FileText, Mail, Folder, Vote, Download } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -50,40 +51,45 @@ export default function Navbar() {
                 <span className="text-xl font-semibold">CondoVoice</span>
               </div>
               
-              <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
-                    <AvatarFallback className="text-pink-500">L</AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Link href="/profile" className="flex items-center w-full">
-                      Profile Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/notifications" className="flex items-center w-full">
-                      Notifications
-                    </Link>
-                  </DropdownMenuItem>
-                  {isInstallable && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={installApp} className="cursor-pointer">
-                        <Download className="mr-2 h-4 w-4" />
-                        Install App
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center space-x-4">
+                {isInstallable && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={installApp}
+                    className="flex items-center space-x-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Install App</span>
+                  </Button>
+                )}
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger>
+                    <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
+                      <AvatarFallback className="text-pink-500">L</AvatarFallback>
+                    </Avatar>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Link href="/profile" className="flex items-center w-full">
+                        Profile Settings
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Link href="/notifications" className="flex items-center w-full">
+                        Notifications
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
             <nav className="h-14 flex items-center space-x-8">
@@ -124,40 +130,45 @@ export default function Navbar() {
               <span className="text-xl font-semibold">CondoVoice</span>
             </div>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
-                  <AvatarFallback className="text-pink-500">L</AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Link href="/profile" className="flex items-center w-full">
-                    Profile Settings
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/notifications" className="flex items-center w-full">
-                    Notifications
-                  </Link>
-                </DropdownMenuItem>
-                {isInstallable && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={installApp} className="cursor-pointer">
-                      <Download className="mr-2 h-4 w-4" />
-                      Install App
-                    </DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center space-x-3">
+              {isInstallable && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={installApp}
+                  className="flex items-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Install</span>
+                </Button>
+              )}
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
+                    <AvatarFallback className="text-pink-500">L</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Link href="/profile" className="flex items-center w-full">
+                      Profile Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/notifications" className="flex items-center w-full">
+                      Notifications
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </header>
 

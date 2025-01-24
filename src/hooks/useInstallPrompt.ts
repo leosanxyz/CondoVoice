@@ -22,11 +22,25 @@ export function useInstallPrompt() {
   useEffect(() => {
     const ready = (e: BeforeInstallPromptEvent) => {
       e.preventDefault();
+      console.log('👋 BeforeInstallPromptEvent fired');
       setPrompt(e);
       setIsInstallable(true);
     };
 
+    // Check if the app is already installed
+    const checkInstalled = () => {
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        console.log('📱 App is already installed');
+        setIsInstallable(false);
+      }
+    };
+
+    checkInstalled();
     window.addEventListener('beforeinstallprompt', ready);
+    window.addEventListener('appinstalled', () => {
+      console.log('🎉 App was installed');
+      setIsInstallable(false);
+    });
 
     return () => {
       window.removeEventListener('beforeinstallprompt', ready);
@@ -34,13 +48,22 @@ export function useInstallPrompt() {
   }, []);
 
   const installApp = async () => {
-    if (!prompt) return;
+    if (!prompt) {
+      console.log('❌ No prompt available');
+      return;
+    }
 
-    await prompt.prompt();
-    const choice = await prompt.userChoice;
-    
-    if (choice.outcome === 'accepted') {
-      setIsInstallable(false);
+    try {
+      console.log('🚀 Triggering install prompt');
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      
+      console.log(`👤 User ${choice.outcome} the installation`);
+      if (choice.outcome === 'accepted') {
+        setIsInstallable(false);
+      }
+    } catch (error) {
+      console.error('❌ Error installing:', error);
     }
   };
 
