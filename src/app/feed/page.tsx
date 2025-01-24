@@ -1,18 +1,52 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, ThumbsUp, MessageCircle, Share2, Loader2 } from 'lucide-react';
-import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged, updateProfile } from 'firebase/auth';
-import useSWR from 'swr';
-import { usePullToRefresh } from 'use-pull-to-refresh';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Plus,
+  ThumbsUp,
+  MessageCircle,
+  Share2,
+  Loader2,
+} from "lucide-react";
+import { db } from "@/lib/firebaseConfig";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
+  doc,
+  updateDoc,
+  setDoc,
+  getDoc,
+  FieldValue, // Para tipar serverTimestamp()
+} from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import useSWR from "swr";
+import { usePullToRefresh } from "use-pull-to-refresh";
+import { Label } from "@/components/ui/label";
+
+/* ------------------------------------------------------------
+   Tipos e interfaces
+------------------------------------------------------------ */
 
 interface PollOption {
   label: string;
@@ -32,6 +66,10 @@ interface User {
   initials: string;
 }
 
+/**
+ * En la base de datos guardamos un objeto que,
+ * tras mapear `timestamp` a un string, quedará así.
+ */
 interface FirebasePost {
   id: string;
   author: {
@@ -41,54 +79,91 @@ interface FirebasePost {
     aptNumber?: string;
   };
   content: string;
-  timestamp: any; // Firebase Timestamp
+  timestamp: string; // Se mapea a string en `fetchPosts()`
   likes: number;
   comments: number;
   poll?: Poll;
 }
 
+/**
+ * Al crear un nuevo Post para Firestore (antes de hacer addDoc),
+ * necesitamos un tipo con `FieldValue` en `timestamp`.
+ */
+interface NewPostData {
+  author: {
+    name: string;
+    avatar: string;
+    initials: string;
+    aptNumber: string;
+  };
+  content: string;
+  timestamp: FieldValue; // serverTimestamp()
+  likes: number;
+  comments: number;
+  poll?: {
+    question: string;
+    options: PollOption[];
+    active: boolean;
+  };
+}
+
 export default function FeedPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostContent, setNewPostContent] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
-  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<PollOption[]>([
-    { label: '', votes: 0 },
-    { label: '', votes: 0 },
+    { label: "", votes: 0 },
+    { label: "", votes: 0 },
   ]);
 
-  const fetchPosts = async () => {
-    const postsCollection = collection(db, 'posts');
-    const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+  /* ------------------------------------------------------------
+     Carga de POSTS
+  ------------------------------------------------------------ */
+  const fetchPosts = async (): Promise<FirebasePost[]> => {
+    const postsCollection = collection(db, "posts");
+    const postsQuery = query(postsCollection, orderBy("timestamp", "desc"));
     const querySnapshot = await getDocs(postsQuery);
 
-    const postsData = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: new Date(doc.data().timestamp?.toDate()).toLocaleString(),
-    })) as FirebasePost[];
+    // Mapeamos a un array tipado con FirebasePost,
+    // pero 'timestamp' lo convertimos a string.
+    const postsData: FirebasePost[] = querySnapshot.docs.map((document) => {
+      const data = document.data();
+
+      return {
+        id: document.id,
+        ...data,
+        timestamp: new Date(data.timestamp?.toDate()).toLocaleString(),
+      } as FirebasePost;
+    });
 
     return postsData;
   };
 
-  const { data: posts, mutate } = useSWR('posts', fetchPosts, {
+  const { data: posts, mutate } = useSWR("posts", fetchPosts, {
     refreshInterval: 0,
     revalidateOnFocus: false,
   });
 
+  /* ------------------------------------------------------------
+     Autenticación y obtención de usuario actual
+  ------------------------------------------------------------ */
   useEffect(() => {
     const auth = getAuth();
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser({
           id: currentUser.uid,
-          name: currentUser.displayName || 'Anonymous',
-          avatar: currentUser.photoURL || '/placeholder.svg',
+          name: currentUser.displayName || "Anonymous",
+          avatar: currentUser.photoURL || "/placeholder.svg",
           initials: currentUser.displayName
-            ? currentUser.displayName.split(' ').map((n) => n[0]).join('')
-            : 'AN',
+            ? currentUser.displayName
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+            : "AN",
         });
       } else {
         setUser(null);
@@ -98,6 +173,9 @@ export default function FeedPage() {
     return () => unsubscribeAuth();
   }, []);
 
+  /* ------------------------------------------------------------
+     Pull to Refresh
+  ------------------------------------------------------------ */
   const { isRefreshing: isPulling, pullToRefresh } = usePullToRefresh({
     onRefresh: async () => {
       setIsRefreshing(true);
@@ -110,35 +188,42 @@ export default function FeedPage() {
     resistance: 2.5,
   });
 
+  /* ------------------------------------------------------------
+     Lógica de creación de Post (normal o con encuesta)
+  ------------------------------------------------------------ */
   const addPollOption = () => {
-    setPollOptions([...pollOptions, { label: '', votes: 0 }]);
+    setPollOptions((current) => [...current, { label: "", votes: 0 }]);
   };
 
   const removePollOption = (index: number) => {
+    // Mantenemos un mínimo de 2 opciones
     if (pollOptions.length > 2) {
-      setPollOptions(pollOptions.filter((_, i) => i !== index));
+      setPollOptions((prev) => prev.filter((_, i) => i !== index));
     }
   };
 
   const handlePollOptionChange = (index: number, newLabel: string) => {
-    const newOptions = [...pollOptions];
-    newOptions[index].label = newLabel;
-    setPollOptions(newOptions);
+    setPollOptions((prev) => {
+      const newOptions = [...prev];
+      newOptions[index].label = newLabel;
+      return newOptions;
+    });
   };
 
   const handleCreatePost = async () => {
     if (!user) return;
 
-    const userDoc = await getDoc(doc(db, 'users', user.id));
-    const aptNumber = userDoc.exists() ? userDoc.data().aptNumber : null;
+    // Obtenemos el aptNumber del usuario, si existe
+    const userDoc = await getDoc(doc(db, "users", user.id));
+    const aptNumber = userDoc.exists() ? userDoc.data().aptNumber : "Not set";
 
-    const postsCollection = collection(db, 'posts');
-    const newPost: any = {
+    // Definimos el tipo exacto del nuevo Post
+    const newPost: NewPostData = {
       author: {
         name: user.name,
         avatar: user.avatar,
         initials: user.initials,
-        aptNumber: aptNumber || 'Not set',
+        aptNumber: aptNumber || "Not set",
       },
       content: newPostContent,
       timestamp: serverTimestamp(),
@@ -146,76 +231,96 @@ export default function FeedPage() {
       comments: 0,
     };
 
-    if (isPoll && pollQuestion.trim() && pollOptions.filter(opt => opt.label.trim()).length >= 2) {
+    // Si creamos una Poll válida, se la anexamos
+    const validPollOptions = pollOptions.filter((opt) =>
+      opt.label.trim()
+    );
+    if (isPoll && pollQuestion.trim() && validPollOptions.length >= 2) {
       newPost.poll = {
         question: pollQuestion.trim(),
-        options: pollOptions.filter(opt => opt.label.trim()),
+        options: validPollOptions,
         active: true,
       };
     }
 
     try {
-      await addDoc(postsCollection, newPost);
+      await addDoc(collection(db, "posts"), newPost);
+
+      // Forzamos la recarga de SWR
       await mutate();
-      setNewPostContent('');
+
+      // Reseteamos estado
+      setNewPostContent("");
       setIsPoll(false);
-      setPollQuestion('');
-      setPollOptions([{ label: '', votes: 0 }, { label: '', votes: 0 }]);
+      setPollQuestion("");
+      setPollOptions([
+        { label: "", votes: 0 },
+        { label: "", votes: 0 },
+      ]);
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error creating post:', error);
+      console.error("Error creating post:", error);
     }
   };
 
+  /* ------------------------------------------------------------
+     Lógica de Votación en encuestas
+  ------------------------------------------------------------ */
   const handleVote = async (postId: string, optionIndex: number) => {
     if (!user) return;
 
-    const postRef = doc(db, 'posts', postId);
+    const postRef = doc(db, "posts", postId);
     const voteRef = doc(db, `posts/${postId}/votes/${user.id}`);
 
     try {
-      // Check if user has already voted
+      // Verificamos si el usuario ya votó
       const voteDoc = await getDoc(voteRef);
       if (voteDoc.exists()) {
-        return; // User has already voted
+        return; // Ya ha votado
       }
 
-      // Get current post data
+      // Obtenemos el post actual
       const postDoc = await getDoc(postRef);
       if (!postDoc.exists()) return;
 
-      const postData = postDoc.data();
+      // Tipamos los datos como un objeto que *puede* tener poll
+      const postData = postDoc.data() as {
+        poll?: { options: PollOption[] };
+      };
       if (!postData.poll?.options) return;
 
-      // Update vote count
+      // Actualizamos el conteo de votos
       const updatedOptions = [...postData.poll.options];
       updatedOptions[optionIndex].votes += 1;
 
-      // Update post and record vote
+      // Guardamos los cambios
       await Promise.all([
         updateDoc(postRef, {
-          'poll.options': updatedOptions
+          "poll.options": updatedOptions,
         }),
         setDoc(voteRef, {
           optionIndex,
-          timestamp: serverTimestamp()
-        })
+          timestamp: serverTimestamp(),
+        }),
       ]);
 
       await mutate();
     } catch (error) {
-      console.error('Error voting:', error);
+      console.error("Error voting:", error);
     }
   };
 
+  /* ------------------------------------------------------------
+     Render
+  ------------------------------------------------------------ */
   return (
-    <div 
+    <div
       className="container mx-auto max-w-2xl px-4 py-8"
       {...pullToRefresh}
     >
       {(isRefreshing || isPulling) && (
-        <div className="fixed top-16 left-0 right-0 flex justify-center z-50">
-          <div className="bg-indigo-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
+        <div className="fixed top-16 left-0 right-0 z-50 flex justify-center">
+          <div className="flex items-center space-x-2 rounded-full bg-indigo-700 px-4 py-2 text-white shadow-lg">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>Refreshing...</span>
           </div>
@@ -245,41 +350,40 @@ export default function FeedPage() {
                 <div className="mt-4 space-y-4">
                   <p className="font-semibold">{post.poll.question}</p>
                   <div className="space-y-2">
-                  {post.poll && (
-  <div className="mt-4 space-y-4">
-    <p className="font-semibold">{post.poll.question}</p>
-    <div className="space-y-2">
-      {post.poll.options.map((option: PollOption, index: number) => {
-        const totalVotes = post.poll.options.reduce((acc: number, opt: PollOption) => acc + opt.votes, 0);
-        const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+                    {post.poll.options.map((option, index) => {
+                      const totalVotes = post.poll!.options.reduce(
+                        (acc, opt) => acc + opt.votes,
+                        0
+                      );
+                      const percentage =
+                        totalVotes > 0
+                          ? (option.votes / totalVotes) * 100
+                          : 0;
 
-        return (
-          <div key={index} className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                name={`poll-${post.id}`}
-                onChange={() => handleVote(post.id, index)}
-                className="h-4 w-4"
-              />
-              <span>{option.label}</span>
-            </div>
-            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-indigo-600"
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-            <div className="text-sm text-gray-500">
-              {option.votes} votes ({percentage.toFixed(1)}%)
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  </div>
-)}
-
+                      return (
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              name={`poll-${post.id}`}
+                              onChange={() => handleVote(post.id, index)}
+                              className="h-4 w-4"
+                            />
+                            <span>{option.label}</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className="h-full bg-indigo-600"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {option.votes} votes (
+                            {percentage.toFixed(1)}%)
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -315,7 +419,9 @@ export default function FeedPage() {
         </DialogTrigger>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Create New Post</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">
+              Create New Post
+            </DialogTitle>
           </DialogHeader>
           <div className="mt-6">
             <div className="flex items-start space-x-4">
@@ -334,7 +440,7 @@ export default function FeedPage() {
                   onChange={(e) => setNewPostContent(e.target.value)}
                   className="min-h-[120px] resize-none border-0 bg-transparent p-0 text-lg focus:ring-0"
                 />
-                
+
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -354,7 +460,9 @@ export default function FeedPage() {
                         type="text"
                         id="poll-question"
                         value={pollQuestion}
-                        onChange={(e) => setPollQuestion(e.target.value)}
+                        onChange={(e) =>
+                          setPollQuestion(e.target.value)
+                        }
                         className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                         placeholder="Ask a question..."
                       />
@@ -363,11 +471,19 @@ export default function FeedPage() {
                     <div className="space-y-2">
                       <Label>Options</Label>
                       {pollOptions.map((option, index) => (
-                        <div key={index} className="flex items-center space-x-2">
+                        <div
+                          key={index}
+                          className="flex items-center space-x-2"
+                        >
                           <input
                             type="text"
                             value={option.label}
-                            onChange={(e) => handlePollOptionChange(index, e.target.value)}
+                            onChange={(e) =>
+                              handlePollOptionChange(
+                                index,
+                                e.target.value
+                              )
+                            }
                             className="flex-1 rounded-md border border-gray-300 px-3 py-2"
                             placeholder={`Option ${index + 1}`}
                           />
@@ -399,27 +515,27 @@ export default function FeedPage() {
           </div>
           <DialogFooter className="sm:justify-between">
             <div className="flex items-center space-x-2">
-              {/* Add attachment options if needed */}
+              {/* Añade más opciones si lo deseas */}
             </div>
             <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
               <Button
                 onClick={handleCreatePost}
                 disabled={
                   (!newPostContent.trim() && !isPoll) ||
-                  (isPoll && (!pollQuestion.trim() || pollOptions.filter(opt => opt.label.trim()).length < 2))
+                  (isPoll &&
+                    (!pollQuestion.trim() ||
+                      pollOptions.filter((opt) => opt.label.trim())
+                        .length < 2))
                 }
                 className="min-w-[80px]"
               >
                 {isRefreshing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  'Post'
+                  "Post"
                 )}
               </Button>
             </div>
