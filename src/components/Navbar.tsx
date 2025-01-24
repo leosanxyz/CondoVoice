@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, FileText, Mail, Folder, Vote } from "lucide-react";
+import { Users, FileText, Mail, Folder, Vote, Download } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,
@@ -14,10 +14,12 @@ import {
 import { auth } from "@/lib/firebaseConfig";
 import { signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { isInstallable, installApp } = useInstallPrompt();
 
   // Hide navbar on these routes
   const hiddenRoutes = ['/', '/register'];
@@ -67,6 +69,15 @@ export default function Navbar() {
                       Notifications
                     </Link>
                   </DropdownMenuItem>
+                  {isInstallable && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={installApp} className="cursor-pointer">
+                        <Download className="mr-2 h-4 w-4" />
+                        Install App
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
                     Logout
@@ -132,6 +143,15 @@ export default function Navbar() {
                     Notifications
                   </Link>
                 </DropdownMenuItem>
+                {isInstallable && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={installApp} className="cursor-pointer">
+                      <Download className="mr-2 h-4 w-4" />
+                      Install App
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleLogout}>
                   Logout
