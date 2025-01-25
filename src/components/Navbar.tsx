@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, FileText, Mail, Folder, Vote, Download } from "lucide-react";
+import { Users, FileText, Mail, Folder, Vote, Download, LucideIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,7 +59,7 @@ export default function Navbar() {
     }
   };
 
-  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: any; label: string }) => {
+  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) => {
     const isActive = pathname === href;
     
     return (
