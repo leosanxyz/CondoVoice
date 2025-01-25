@@ -16,11 +16,33 @@ import { auth } from "@/lib/firebaseConfig";
 import { signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
+import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+
+const navItems = [
+  { href: "/feed", icon: FileText, label: "Feed" },
+  { href: "/users", icon: Users, label: "Users" },
+  { href: "/documents", icon: Folder, label: "Docs" },
+  { href: "/votes", icon: Vote, label: "Votes" },
+];
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { isInstallable, installApp } = useInstallPrompt();
+  const [previousPath, setPreviousPath] = useState(pathname);
+
+  useEffect(() => {
+    setPreviousPath(pathname);
+  }, [pathname]);
+
+  const getSlideDirection = (current: string, previous: string) => {
+    const currentIndex = navItems.findIndex(item => item.href === current);
+    const previousIndex = navItems.findIndex(item => item.href === previous);
+    
+    if (currentIndex === -1 || previousIndex === -1) return 0;
+    return currentIndex > previousIndex ? 1 : -1;
+  };
 
   // Hide navbar on these routes
   const hiddenRoutes = ['/', '/register'];
@@ -35,6 +57,33 @@ export default function Navbar() {
     } catch (error) {
       console.error("Error logging out:", error);
     }
+  };
+
+  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: any; label: string }) => {
+    const isActive = pathname === href;
+    
+    return (
+      <Link href={href} className="relative">
+        <motion.div
+          className="flex flex-col items-center p-2 text-gray-600 hover:text-indigo-700"
+          whileTap={{ scale: 0.9 }}
+          animate={isActive ? { y: [0, -4, 0] } : {}}
+          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+        >
+          <Icon className={`h-6 w-6 ${isActive ? 'text-indigo-700' : ''}`} />
+          <span className={`text-xs mt-1 ${isActive ? 'text-indigo-700 font-medium' : ''}`}>
+            {label}
+          </span>
+          {isActive && (
+            <motion.div
+              className="absolute -bottom-2 left-0 right-0 h-0.5 bg-indigo-700"
+              layoutId="activeTab"
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            />
+          )}
+        </motion.div>
+      </Link>
+    );
   };
 
   return (
@@ -173,30 +222,17 @@ export default function Navbar() {
         </header>
 
         {/* Fixed Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+        <nav className="fixed bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-2xl shadow-lg z-50">
           <div className="flex justify-around items-center h-16">
-            <Link href="/feed" className="flex flex-col items-center p-2 text-gray-600 hover:text-indigo-700">
-              <FileText className="h-6 w-6" />
-              <span className="text-xs mt-1">Feed</span>
-            </Link>
-            <Link href="/users" className="flex flex-col items-center p-2 text-gray-600 hover:text-indigo-700">
-              <Users className="h-6 w-6" />
-              <span className="text-xs mt-1">Users</span>
-            </Link>
-            <Link href="/documents" className="flex flex-col items-center p-2 text-gray-600 hover:text-indigo-700">
-              <Folder className="h-6 w-6" />
-              <span className="text-xs mt-1">Docs</span>
-            </Link>
-            <Link href="/votes" className="flex flex-col items-center p-2 text-gray-600 hover:text-indigo-700">
-              <Vote className="h-6 w-6" />
-              <span className="text-xs mt-1">Votes</span>
-            </Link>
+            {navItems.map((item) => (
+              <NavLink key={item.href} {...item} />
+            ))}
           </div>
         </nav>
 
         {/* Content Padding */}
-        <div className="pt-16 pb-16">
-          {/* This ensures content doesn't get hidden under fixed headers */}
+        <div className="pt-16 pb-24">
+          {/* Increased bottom padding to prevent content from being hidden */}
         </div>
       </div>
     </>
