@@ -31,7 +31,14 @@ export default function ClientLayout({
     const currentIndex = navItems.indexOf(pathname);
     const previousIndex = navItems.indexOf(previousPath);
     
-    if (currentIndex === -1 || previousIndex === -1) return 0;
+    // If either path is not in navItems (like profile, notifications, etc)
+    // or if we're at the same index, don't slide
+    if (currentIndex === -1 || previousIndex === -1 || currentIndex === previousIndex) {
+      return 0;
+    }
+
+    // Return positive for right-to-left (moving forward in navbar)
+    // Return negative for left-to-right (moving backward in navbar)
     return currentIndex > previousIndex ? 100 : -100;
   };
 

@@ -17,18 +17,26 @@ import { signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
 const navItems = [
-  { href: "/feed", icon: FileText, label: "Feed" },
-  { href: "/users", icon: Users, label: "Users" },
-  { href: "/documents", icon: Folder, label: "Docs" },
-  { href: "/votes", icon: Vote, label: "Votes" },
+  { href: "/feed", icon: FileText, label: "Feed", position: 0 },
+  { href: "/users", icon: Users, label: "Users", position: 1 },
+  { href: "/documents", icon: Folder, label: "Docs", position: 2 },
+  { href: "/votes", icon: Vote, label: "Votes", position: 3 },
 ];
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { isInstallable, installApp } = useInstallPrompt();
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [activeTab, setActiveTab] = useState(pathname);
+
+  useEffect(() => {
+    setIsNavigating(false);
+    setActiveTab(pathname);
+  }, [pathname]);
 
   // Hide navbar on these routes
   const hiddenRoutes = ['/', '/register'];
@@ -45,11 +53,19 @@ export default function Navbar() {
     }
   };
 
-  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) => {
-    const isActive = pathname === href;
+  const handleNavigation = (href: string) => {
+    setIsNavigating(true);
+    router.push(href);
+  };
+
+  const NavLink = ({ href, icon: Icon, label, position }: { href: string; icon: LucideIcon; label: string; position: number }) => {
+    const isActive = !isNavigating && pathname === href;
     
     return (
-      <Link href={href} className="relative">
+      <button 
+        onClick={() => handleNavigation(href)}
+        className="relative w-full"
+      >
         <motion.div
           className="flex flex-col items-center p-2 text-gray-600 hover:text-indigo-700"
           whileTap={{ scale: 0.9 }}
@@ -60,17 +76,12 @@ export default function Navbar() {
           <span className={`text-xs mt-1 ${isActive ? 'text-indigo-700 font-medium' : ''}`}>
             {label}
           </span>
-          {isActive && (
-            <motion.div
-              className="absolute -bottom-2 left-0 right-0 h-0.5 bg-indigo-700"
-              layoutId="activeTab"
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            />
-          )}
         </motion.div>
-      </Link>
+      </button>
     );
   };
+
+  const activeIndex = navItems.findIndex(item => item.href === pathname);
 
   return (
     <>
@@ -209,10 +220,23 @@ export default function Navbar() {
 
         {/* Fixed Bottom Navigation */}
         <nav className="fixed bottom-6 left-4 right-4 bg-white border border-gray-200 rounded-2xl shadow-lg z-40">
-          <div className="flex justify-around items-center h-20">
+          <div className="flex justify-around items-center h-20 relative">
             {navItems.map((item) => (
               <NavLink key={item.href} {...item} />
             ))}
+            <motion.div
+              className="absolute -bottom-2 h-0.5 bg-indigo-700"
+              animate={{
+                left: `${activeIndex * 25}%`,
+                width: '25%'
+              }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 400, 
+                damping: 40,
+                duration: 0.2
+              }}
+            />
           </div>
         </nav>
 
