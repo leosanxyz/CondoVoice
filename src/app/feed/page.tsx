@@ -43,6 +43,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import useSWR from "swr";
 import { usePullToRefresh } from "use-pull-to-refresh";
 import { Label } from "@/components/ui/label";
+import { motion } from "framer-motion";
 
 /* ------------------------------------------------------------
    Tipos e interfaces
@@ -410,12 +411,13 @@ export default function FeedPage() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
-          <Button
-            className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg md:bottom-6"
-            size="icon"
+          <motion.button
+            onClick={() => setIsDialogOpen(true)}
+            whileTap={{ scale: 0.9 }}
+            className="fixed right-6 bottom-28 bg-indigo-600 text-white rounded-full p-4 shadow-lg z-50 hover:bg-indigo-700 transition-colors"
           >
-            <Plus className="h-6 w-6" />
-          </Button>
+            <Plus className="h-8 w-8" />
+          </motion.button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>

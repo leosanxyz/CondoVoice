@@ -47,8 +47,9 @@ export default function ClientLayout({
             exit={{ opacity: 0, x: -getSlideDirection() }}
             transition={{ 
               type: "spring",
-              stiffness: 300,
-              damping: 30,
+              stiffness: 400,
+              damping: 40,
+              duration: 0.15
             }}
             className="overflow-hidden"
           >

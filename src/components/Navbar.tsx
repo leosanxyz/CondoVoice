@@ -156,7 +156,7 @@ export default function Navbar() {
       {/* Mobile Navigation */}
       <div className="md:hidden">
         {/* Fixed Top Header */}
-        <header className="fixed top-0 left-0 right-0 bg-indigo-700 text-white z-50">
+        <header className="fixed top-0 left-0 right-0 bg-indigo-700 text-white z-40">
           <div className="h-16 px-4 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
@@ -208,8 +208,8 @@ export default function Navbar() {
         </header>
 
         {/* Fixed Bottom Navigation */}
-        <nav className="fixed bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-2xl shadow-lg z-50">
-          <div className="flex justify-around items-center h-16">
+        <nav className="fixed bottom-6 left-4 right-4 bg-white border border-gray-200 rounded-2xl shadow-lg z-40">
+          <div className="flex justify-around items-center h-20">
             {navItems.map((item) => (
               <NavLink key={item.href} {...item} />
             ))}
@@ -217,7 +217,7 @@ export default function Navbar() {
         </nav>
 
         {/* Content Padding */}
-        <div className="pt-16 pb-24">
+        <div className="pt-16 pb-28">
           {/* Increased bottom padding to prevent content from being hidden */}
         </div>
       </div>
