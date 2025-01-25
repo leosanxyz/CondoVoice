@@ -17,7 +17,6 @@ import { signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
 
 const navItems = [
   { href: "/feed", icon: FileText, label: "Feed" },
@@ -30,19 +29,6 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { isInstallable, installApp } = useInstallPrompt();
-  const [previousPath, setPreviousPath] = useState(pathname);
-
-  useEffect(() => {
-    setPreviousPath(pathname);
-  }, [pathname]);
-
-  const getSlideDirection = (current: string, previous: string) => {
-    const currentIndex = navItems.findIndex(item => item.href === current);
-    const previousIndex = navItems.findIndex(item => item.href === previous);
-    
-    if (currentIndex === -1 || previousIndex === -1) return 0;
-    return currentIndex > previousIndex ? 1 : -1;
-  };
 
   // Hide navbar on these routes
   const hiddenRoutes = ['/', '/register'];
@@ -53,7 +39,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.push('/'); // Redirect to login page after logout
+      router.push('/');
     } catch (error) {
       console.error("Error logging out:", error);
     }
