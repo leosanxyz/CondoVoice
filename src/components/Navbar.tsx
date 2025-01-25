@@ -17,13 +17,13 @@ import { signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const navItems = [
-  { href: "/feed", icon: FileText, label: "Feed", position: 0 },
-  { href: "/users", icon: Users, label: "Users", position: 1 },
-  { href: "/documents", icon: Folder, label: "Docs", position: 2 },
-  { href: "/votes", icon: Vote, label: "Votes", position: 3 },
+  { href: "/feed", icon: FileText, label: "Feed" },
+  { href: "/users", icon: Users, label: "Users" },
+  { href: "/documents", icon: Folder, label: "Docs" },
+  { href: "/votes", icon: Vote, label: "Votes" },
 ];
 
 export default function Navbar() {
@@ -31,12 +31,6 @@ export default function Navbar() {
   const pathname = usePathname();
   const { isInstallable, installApp } = useInstallPrompt();
   const [isNavigating, setIsNavigating] = useState(false);
-  const [activeTab, setActiveTab] = useState(pathname);
-
-  useEffect(() => {
-    setIsNavigating(false);
-    setActiveTab(pathname);
-  }, [pathname]);
 
   // Hide navbar on these routes
   const hiddenRoutes = ['/', '/register'];
@@ -58,7 +52,7 @@ export default function Navbar() {
     router.push(href);
   };
 
-  const NavLink = ({ href, icon: Icon, label, position }: { href: string; icon: LucideIcon; label: string; position: number }) => {
+  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) => {
     const isActive = !isNavigating && pathname === href;
     
     return (
