@@ -557,32 +557,66 @@ export default function FeedPage() {
                   </SheetTrigger>
                   <SheetContent side="right" className="w-full sm:max-w-lg">
                     <SheetHeader>
-                      <SheetTitle>Comments</SheetTitle>
+                      <SheetTitle>Post Details</SheetTitle>
                     </SheetHeader>
                     <div className="flex flex-col h-full">
+                      {/* Post Preview */}
+                      <div className="border-b pb-4">
+                        <div className="flex items-center space-x-4">
+                          <Avatar>
+                            <AvatarImage src={post.author.avatar} />
+                            <AvatarFallback>{post.author.initials}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-semibold">{post.author.name}</div>
+                            <div className="text-sm text-gray-500">
+                              <span>{post.timestamp}</span>
+                              <span> • </span>
+                              <span>APT {post.author.aptNumber}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-3 text-gray-700">{post.content}</p>
+                        <div className="mt-4 flex items-center space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className={`space-x-2 ${post.likes?.includes(user?.id || '') ? 'text-indigo-600' : ''}`}
+                            onClick={() => handleLike(post.id)}
+                          >
+                            <ThumbsUp className={`h-4 w-4 ${post.likes?.includes(user?.id || '') ? 'fill-current' : ''}`} />
+                            <span>{Array.isArray(post.likes) ? post.likes.length : 0}</span>
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="py-4 border-b">
+                        <h2 className="font-semibold text-lg">Comments</h2>
+                      </div>
+
                       <ScrollArea className="flex-1 pr-4 -mr-4">
                         <div className="space-y-4 py-4">
-                          {Array.isArray(post.comments) && post.comments.map((comment) => (
+                          {post.comments?.map((comment) => (
                             <div key={comment.id} className="flex space-x-3">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={comment.author?.avatar || ''} />
-                                <AvatarFallback>{comment.author?.initials || 'AN'}</AvatarFallback>
+                                <AvatarImage src={comment.author.avatar} />
+                                <AvatarFallback>{comment.author.initials}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1">
                                 <div className="flex items-center space-x-2">
-                                  <span className="font-medium">{comment.author?.name || 'Anonymous'}</span>
-                                  <span className="text-sm text-gray-500">APT {comment.author?.aptNumber || 'Not set'}</span>
+                                  <span className="font-medium">{comment.author.name}</span>
+                                  <span className="text-sm text-gray-500">APT {comment.author.aptNumber}</span>
                                 </div>
-                                <p className="text-sm text-gray-700 mt-1">{comment.content || ''}</p>
+                                <p className="text-sm text-gray-700 mt-1">{comment.content}</p>
                                 <span className="text-xs text-gray-500 mt-1">
-                                  {format(new Date(comment.timestamp || new Date()), 'MMM d, yyyy h:mm a')}
+                                  {format(new Date(comment.timestamp), 'MMM d, yyyy h:mm a')}
                                 </span>
                               </div>
                             </div>
                           ))}
                         </div>
                       </ScrollArea>
-                      <div className="border-t pt-4 mt-auto">
+                      <div className="border-t pt-4 mt-auto pb-6">
                         <div className="flex space-x-2">
                           <Textarea
                             value={newComment}
@@ -624,9 +658,7 @@ export default function FeedPage() {
         </DialogTrigger>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
-              Create New Post
-            </DialogTitle>
+            <DialogTitle>Create New Post</DialogTitle>
           </DialogHeader>
           <div className="mt-6">
             <div className="flex items-start space-x-4">
