@@ -490,7 +490,10 @@ export default function FeedPage() {
      Render
   ------------------------------------------------------------ */
   return (
-    <div className="container mx-auto px-4 py-2 md:py-8 pb-36">
+    <div 
+      className="container mx-auto px-4 py-2 md:py-8 pb-36"
+      {...pullToRefresh}
+    >
       {(isRefreshing || isPulling) && (
         <div className="fixed top-16 left-0 right-0 z-50 flex justify-center">
           <div className="flex items-center space-x-2 rounded-full bg-indigo-700 px-4 py-2 text-white shadow-lg">

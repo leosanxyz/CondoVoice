@@ -18,7 +18,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { getDoc, doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import { cn } from "@/lib/utils";
 
