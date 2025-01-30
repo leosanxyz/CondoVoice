@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------
    Tipos e interfaces
@@ -75,6 +76,7 @@ interface User {
   avatar: string;
   initials: string;
   aptNumber?: string;
+  isEmojiAvatar: boolean;
 }
 
 /**
@@ -88,6 +90,7 @@ interface Comment {
     avatar: string;
     initials: string;
     aptNumber: string;
+    isEmojiAvatar: boolean;
   };
   content: string;
   timestamp: string;
@@ -96,10 +99,12 @@ interface Comment {
 interface FirebasePost {
   id: string;
   author: {
+    id: string;
     name: string;
     avatar: string;
     initials: string;
-    aptNumber?: string;
+    aptNumber: string;
+    isEmojiAvatar: boolean;
   };
   content: string;
   timestamp: string;
@@ -114,10 +119,12 @@ interface FirebasePost {
  */
 interface NewPostData {
   author: {
+    id: string;
     name: string;
     avatar: string;
     initials: string;
     aptNumber: string;
+    isEmojiAvatar: boolean;
   };
   content: string;
   timestamp: FieldValue;
@@ -137,6 +144,7 @@ interface RawComment {
     avatar?: string;
     initials?: string;
     aptNumber?: string;
+    isEmojiAvatar?: boolean;
   };
   content?: string;
   timestamp?: string | { toDate(): Date };
@@ -160,44 +168,64 @@ export default function FeedPage() {
      Carga de POSTS
   ------------------------------------------------------------ */
   const fetchPosts = async (): Promise<FirebasePost[]> => {
-    const postsCollection = collection(db, "posts");
-    const postsQuery = query(postsCollection, orderBy("timestamp", "desc"));
-    const querySnapshot = await getDocs(postsQuery);
+    try {
+      const postsCollection = collection(db, "posts");
+      const postsQuery = query(postsCollection, orderBy("timestamp", "desc"));
+      const querySnapshot = await getDocs(postsQuery);
 
-    const postsData: FirebasePost[] = await Promise.all(querySnapshot.docs.map(async (document) => {
-      const data = document.data();
-      const rawComments = data.comments || [];
-      const comments = rawComments.map((comment: RawComment) => ({
-        id: comment.id || crypto.randomUUID(),
-        author: {
-          name: comment.author?.name || 'Anonymous',
-          avatar: comment.author?.avatar || '',
-          initials: comment.author?.initials || 'AN',
-          aptNumber: comment.author?.aptNumber || 'Not set',
-        },
-        content: comment.content || '',
-        timestamp: typeof comment.timestamp === 'string'
-          ? comment.timestamp
-          : format(new Date(), 'yyyy-MM-dd\'T\'HH:mm')
+      const postsData: FirebasePost[] = await Promise.all(querySnapshot.docs.map(async (document) => {
+        const data = document.data();
+        const rawComments = data.comments || [];
+
+        // Get the author's current data from Firestore
+        let authorData = null;
+        if (data.author && typeof data.author.id === 'string') {
+          try {
+            const authorDoc = await getDoc(doc(db, 'users', data.author.id));
+            authorData = authorDoc.exists() ? authorDoc.data() : null;
+          } catch (error) {
+            console.error('Error fetching author data:', error);
+          }
+        }
+
+        const comments = rawComments.map((comment: RawComment) => ({
+          id: comment.id || crypto.randomUUID(),
+          author: {
+            name: comment.author?.name || 'Anonymous',
+            avatar: comment.author?.avatar || '',
+            initials: comment.author?.initials || 'AN',
+            aptNumber: comment.author?.aptNumber || 'Not set',
+            isEmojiAvatar: comment.author?.isEmojiAvatar || false,
+          },
+          content: comment.content || '',
+          timestamp: typeof comment.timestamp === 'string'
+            ? comment.timestamp
+            : format(new Date(), 'MMM d, yyyy h:mm a')
+        }));
+
+        return {
+          id: document.id,
+          author: {
+            id: data.author?.id || document.id, // Fallback to document ID if no author ID
+            name: data.author?.name || 'Anonymous',
+            avatar: authorData?.avatar || data.author?.avatar || '',
+            initials: data.author?.initials || 'AN',
+            aptNumber: data.author?.aptNumber || 'Not set',
+            isEmojiAvatar: authorData?.isEmojiAvatar || data.author?.isEmojiAvatar || false,
+          },
+          content: data.content || '',
+          timestamp: data.timestamp?.toDate ? format(data.timestamp.toDate(), 'MMM d, yyyy h:mm a') : format(new Date(), 'MMM d, yyyy h:mm a'),
+          likes: Array.isArray(data.likes) ? data.likes : [],
+          comments,
+          poll: data.poll,
+        };
       }));
 
-      return {
-        id: document.id,
-        author: {
-          name: data.author?.name || 'Anonymous',
-          avatar: data.author?.avatar || '',
-          initials: data.author?.initials || 'AN',
-          aptNumber: data.author?.aptNumber || 'Not set',
-        },
-        content: data.content || '',
-        timestamp: data.timestamp?.toDate ? format(new Date(data.timestamp.toDate()), 'MMM d, yyyy h:mm a') : format(new Date(), 'MMM d, yyyy h:mm a'),
-        likes: Array.isArray(data.likes) ? data.likes : [],
-        comments,
-        poll: data.poll,
-      } as FirebasePost;
-    }));
-
-    return postsData;
+      return postsData;
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      return [];
+    }
   };
 
   const { data: posts, mutate } = useSWR("posts", fetchPosts, {
@@ -222,6 +250,7 @@ export default function FeedPage() {
                 .map((n) => n[0])
                 .join("")
             : "AN",
+          isEmojiAvatar: false,
         });
       } else {
         setUser(null);
@@ -271,17 +300,19 @@ export default function FeedPage() {
   const handleCreatePost = async () => {
     if (!user) return;
 
-    // Obtenemos el aptNumber del usuario, si existe
+    // Get the current user data from Firestore
     const userDoc = await getDoc(doc(db, "users", user.id));
-    const aptNumber = userDoc.exists() ? userDoc.data().aptNumber : "Not set";
+    const userData = userDoc.exists() ? userDoc.data() : null;
 
     // Definimos el tipo exacto del nuevo Post
     const newPost: NewPostData = {
       author: {
+        id: user.id,
         name: user.name,
-        avatar: user.avatar,
+        avatar: userData?.avatar || user.avatar,
         initials: user.initials,
-        aptNumber: aptNumber || "Not set",
+        aptNumber: userData?.aptNumber || "Not set",
+        isEmojiAvatar: userData?.isEmojiAvatar || false,
       },
       content: newPostContent,
       timestamp: serverTimestamp(),
@@ -436,6 +467,7 @@ export default function FeedPage() {
           avatar: user.avatar,
           initials: user.initials,
           aptNumber: userAptNumber,  // Usamos el número de apartamento obtenido de Firestore
+          isEmojiAvatar: user.isEmojiAvatar,
         },
         content: newComment.trim(),
         timestamp: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
@@ -458,10 +490,7 @@ export default function FeedPage() {
      Render
   ------------------------------------------------------------ */
   return (
-    <div
-      className="container mx-auto max-w-2xl px-4 py-8"
-      {...pullToRefresh}
-    >
+    <div className="container mx-auto px-4 py-2 md:py-8 pb-36">
       {(isRefreshing || isPulling) && (
         <div className="fixed top-16 left-0 right-0 z-50 flex justify-center">
           <div className="flex items-center space-x-2 rounded-full bg-indigo-700 px-4 py-2 text-white shadow-lg">
@@ -475,8 +504,17 @@ export default function FeedPage() {
         {posts?.map((post) => (
           <Card key={post.id}>
             <CardHeader className="flex flex-row items-center space-x-4 p-4">
-              <Avatar>
-                <AvatarImage src={post.author.avatar} />
+              <Avatar className={cn(
+                "h-8 w-8 overflow-visible",
+                post.author.isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : undefined
+              )}>
+                <AvatarImage 
+                  src={post.author.avatar} 
+                  className={cn(
+                    "object-contain",
+                    post.author.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                  )}
+                />
                 <AvatarFallback>{post.author.initials}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
@@ -563,8 +601,17 @@ export default function FeedPage() {
                       {/* Post Preview */}
                       <div className="border-b pb-4">
                         <div className="flex items-center space-x-4">
-                          <Avatar>
-                            <AvatarImage src={post.author.avatar} />
+                          <Avatar className={cn(
+                            "h-8 w-8 overflow-visible",
+                            post.author.isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : undefined
+                          )}>
+                            <AvatarImage 
+                              src={post.author.avatar} 
+                              className={cn(
+                                "object-contain",
+                                post.author.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                              )}
+                            />
                             <AvatarFallback>{post.author.initials}</AvatarFallback>
                           </Avatar>
                           <div>
@@ -598,8 +645,17 @@ export default function FeedPage() {
                         <div className="space-y-4 py-4">
                           {post.comments?.map((comment) => (
                             <div key={comment.id} className="flex space-x-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={comment.author.avatar} />
+                              <Avatar className={cn(
+                                "h-8 w-8 overflow-visible",
+                                comment.author.isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : undefined
+                              )}>
+                                <AvatarImage 
+                                  src={comment.author.avatar} 
+                                  className={cn(
+                                    "object-contain",
+                                    comment.author.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                                  )}
+                                />
                                 <AvatarFallback>{comment.author.initials}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1">

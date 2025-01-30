@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Users, FileText, Mail, Folder, Vote, Download, LucideIcon } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -17,7 +17,10 @@ import { signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getDoc, doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebaseConfig";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/feed", icon: FileText, label: "Feed" },
@@ -31,12 +34,41 @@ export default function Navbar() {
   const pathname = usePathname();
   const { isInstallable, installApp } = useInstallPrompt();
   const [isNavigating, setIsNavigating] = useState(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userInitials, setUserInitials] = useState('');
+  const [isEmojiAvatar, setIsEmojiAvatar] = useState(false);
 
-  // Hide navbar on these routes
-  const hiddenRoutes = ['/', '/register'];
-  if (hiddenRoutes.includes(pathname)) {
-    return null;
-  }
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        // Get initial user data from Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        
+        // Set up real-time listener for user document
+        const unsubscribeDoc = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            const userData = doc.data();
+            setUserAvatar(userData.avatar || user.photoURL || '/placeholder.svg');
+            setIsEmojiAvatar(userData.isEmojiAvatar || false);
+          } else {
+            setUserAvatar(user.photoURL || '/placeholder.svg');
+            setIsEmojiAvatar(false);
+          }
+          setUserInitials(
+            user.displayName
+              ? user.displayName.split(' ').map(n => n[0]).join('')
+              : 'A'
+          );
+        });
+
+        return () => {
+          unsubscribeDoc();
+        };
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -46,6 +78,13 @@ export default function Navbar() {
       console.error("Error logging out:", error);
     }
   };
+
+  // Move the early return after all hooks
+  // Hide navbar on these routes
+  const hiddenRoutes = ['/', '/register'];
+  if (hiddenRoutes.includes(pathname)) {
+    return null;
+  }
 
   const handleNavigation = (href: string) => {
     setIsNavigating(true);
@@ -106,20 +145,30 @@ export default function Navbar() {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger>
-                    <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
-                      <AvatarFallback className="text-pink-500">L</AvatarFallback>
+                    <Avatar className={cn(
+                      "h-8 w-8 cursor-pointer hover:opacity-90 overflow-visible",
+                      isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : "bg-pink-100"
+                    )}>
+                      <AvatarImage 
+                        src={userAvatar || '/placeholder.svg'} 
+                        className={cn(
+                          "object-contain",
+                          isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                        )}
+                      />
+                      <AvatarFallback className="text-pink-500">{userInitials}</AvatarFallback>
                     </Avatar>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Link href="/profile" className="flex items-center w-full">
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="w-full">
                         Profile Settings
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Link href="/notifications" className="flex items-center w-full">
+                    <DropdownMenuItem asChild>
+                      <Link href="/notifications" className="w-full">
                         Notifications
                       </Link>
                     </DropdownMenuItem>
@@ -162,7 +211,7 @@ export default function Navbar() {
       <div className="md:hidden">
         {/* Fixed Top Header */}
         <header className="fixed top-0 left-0 right-0 bg-indigo-700 text-white z-40">
-          <div className="h-16 px-4 flex items-center justify-between">
+          <div className="h-12 md:h-16 px-4 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
                 <span className="text-indigo-700 font-bold">CV</span>
@@ -185,20 +234,30 @@ export default function Navbar() {
               
               <DropdownMenu>
                 <DropdownMenuTrigger>
-                  <Avatar className="h-8 w-8 bg-pink-100 cursor-pointer hover:opacity-90">
-                    <AvatarFallback className="text-pink-500">L</AvatarFallback>
+                  <Avatar className={cn(
+                    "h-8 w-8 cursor-pointer hover:opacity-90 overflow-visible",
+                    isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : "bg-pink-100"
+                  )}>
+                    <AvatarImage 
+                      src={userAvatar || '/placeholder.svg'} 
+                      className={cn(
+                        "object-contain",
+                        isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                      )}
+                    />
+                    <AvatarFallback className="text-pink-500">{userInitials}</AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Link href="/profile" className="flex items-center w-full">
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="w-full">
                       Profile Settings
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/notifications" className="flex items-center w-full">
+                  <DropdownMenuItem asChild>
+                    <Link href="/notifications" className="w-full">
                       Notifications
                     </Link>
                   </DropdownMenuItem>
@@ -235,7 +294,7 @@ export default function Navbar() {
         </nav>
 
         {/* Content Padding */}
-        <div className="pt-16 pb-28">
+        <div className="pt-[.25rem] md:pt-16 pb-28">
           {/* Increased bottom padding to prevent content from being hidden */}
         </div>
       </div>
