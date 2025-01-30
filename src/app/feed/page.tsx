@@ -130,6 +130,18 @@ interface NewPostData {
   };
 }
 
+interface RawComment {
+  id?: string;
+  author?: {
+    name?: string;
+    avatar?: string;
+    initials?: string;
+    aptNumber?: string;
+  };
+  content?: string;
+  timestamp?: string | { toDate(): Date };
+}
+
 export default function FeedPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
@@ -141,7 +153,6 @@ export default function FeedPage() {
     { label: "", votes: 0 },
     { label: "", votes: 0 },
   ]);
-  const [selectedPost, setSelectedPost] = useState<FirebasePost | null>(null);
   const [newComment, setNewComment] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
@@ -156,7 +167,7 @@ export default function FeedPage() {
     const postsData: FirebasePost[] = await Promise.all(querySnapshot.docs.map(async (document) => {
       const data = document.data();
       const rawComments = data.comments || [];
-      const comments = rawComments.map((comment: any) => ({
+      const comments = rawComments.map((comment: RawComment) => ({
         id: comment.id || crypto.randomUUID(),
         author: {
           name: comment.author?.name || 'Anonymous',
@@ -165,9 +176,9 @@ export default function FeedPage() {
           aptNumber: comment.author?.aptNumber || 'Not set',
         },
         content: comment.content || '',
-        timestamp: typeof comment.timestamp === 'string' 
-          ? comment.timestamp 
-          : format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
+        timestamp: typeof comment.timestamp === 'string'
+          ? comment.timestamp
+          : format(new Date(), 'yyyy-MM-dd\'T\'HH:mm')
       }));
 
       return {
@@ -539,10 +550,9 @@ export default function FeedPage() {
                       variant="ghost" 
                       size="sm" 
                       className="space-x-2"
-                      onClick={() => setSelectedPost(post)}
                     >
                       <MessageCircle className="h-4 w-4" />
-                      <span>{Array.isArray(post.comments) ? post.comments.length : 0}</span>
+                      <span>{post.comments?.length || 0}</span>
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="right" className="w-full sm:max-w-lg">
