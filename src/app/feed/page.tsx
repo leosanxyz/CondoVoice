@@ -22,7 +22,6 @@ import {
   Plus,
   ThumbsUp,
   MessageCircle,
-  Share2,
   Loader2,
 } from "lucide-react";
 import { db } from "@/lib/firebaseConfig";
@@ -38,12 +37,22 @@ import {
   setDoc,
   getDoc,
   FieldValue, // Para tipar serverTimestamp()
+  arrayUnion,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import useSWR from "swr";
 import { usePullToRefresh } from "use-pull-to-refresh";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
 
 /* ------------------------------------------------------------
    Tipos e interfaces
@@ -65,12 +74,25 @@ interface User {
   name: string;
   avatar: string;
   initials: string;
+  aptNumber?: string;
 }
 
 /**
  * En la base de datos guardamos un objeto que,
  * tras mapear `timestamp` a un string, quedará así.
  */
+interface Comment {
+  id: string;
+  author: {
+    name: string;
+    avatar: string;
+    initials: string;
+    aptNumber: string;
+  };
+  content: string;
+  timestamp: string;
+}
+
 interface FirebasePost {
   id: string;
   author: {
@@ -80,9 +102,9 @@ interface FirebasePost {
     aptNumber?: string;
   };
   content: string;
-  timestamp: string; // Se mapea a string en `fetchPosts()`
-  likes: number;
-  comments: number;
+  timestamp: string;
+  likes: string[]; // Array of user IDs who liked the post
+  comments: Comment[];
   poll?: Poll;
 }
 
@@ -98,9 +120,9 @@ interface NewPostData {
     aptNumber: string;
   };
   content: string;
-  timestamp: FieldValue; // serverTimestamp()
-  likes: number;
-  comments: number;
+  timestamp: FieldValue;
+  likes: string[]; // Array of user IDs
+  comments: Comment[]; // Array of comments
   poll?: {
     question: string;
     options: PollOption[];
@@ -119,6 +141,9 @@ export default function FeedPage() {
     { label: "", votes: 0 },
     { label: "", votes: 0 },
   ]);
+  const [selectedPost, setSelectedPost] = useState<FirebasePost | null>(null);
+  const [newComment, setNewComment] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   /* ------------------------------------------------------------
      Carga de POSTS
@@ -128,17 +153,38 @@ export default function FeedPage() {
     const postsQuery = query(postsCollection, orderBy("timestamp", "desc"));
     const querySnapshot = await getDocs(postsQuery);
 
-    // Mapeamos a un array tipado con FirebasePost,
-    // pero 'timestamp' lo convertimos a string.
-    const postsData: FirebasePost[] = querySnapshot.docs.map((document) => {
+    const postsData: FirebasePost[] = await Promise.all(querySnapshot.docs.map(async (document) => {
       const data = document.data();
+      const rawComments = data.comments || [];
+      const comments = rawComments.map((comment: any) => ({
+        id: comment.id || crypto.randomUUID(),
+        author: {
+          name: comment.author?.name || 'Anonymous',
+          avatar: comment.author?.avatar || '',
+          initials: comment.author?.initials || 'AN',
+          aptNumber: comment.author?.aptNumber || 'Not set',
+        },
+        content: comment.content || '',
+        timestamp: typeof comment.timestamp === 'string' 
+          ? comment.timestamp 
+          : format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
+      }));
 
       return {
         id: document.id,
-        ...data,
-        timestamp: new Date(data.timestamp?.toDate()).toLocaleString(),
+        author: {
+          name: data.author?.name || 'Anonymous',
+          avatar: data.author?.avatar || '',
+          initials: data.author?.initials || 'AN',
+          aptNumber: data.author?.aptNumber || 'Not set',
+        },
+        content: data.content || '',
+        timestamp: data.timestamp?.toDate ? format(new Date(data.timestamp.toDate()), 'MMM d, yyyy h:mm a') : format(new Date(), 'MMM d, yyyy h:mm a'),
+        likes: Array.isArray(data.likes) ? data.likes : [],
+        comments,
+        poll: data.poll,
       } as FirebasePost;
-    });
+    }));
 
     return postsData;
   };
@@ -228,8 +274,8 @@ export default function FeedPage() {
       },
       content: newPostContent,
       timestamp: serverTimestamp(),
-      likes: 0,
-      comments: 0,
+      likes: [], // Initialize empty array for likes
+      comments: [], // Initialize empty array for comments
     };
 
     // Si creamos una Poll válida, se la anexamos
@@ -308,6 +354,92 @@ export default function FeedPage() {
       await mutate();
     } catch (error) {
       console.error("Error voting:", error);
+    }
+  };
+
+  const handleLike = async (postId: string) => {
+    if (!user) return;
+    console.log("Liking post:", postId);
+
+    try {
+      // Optimistically update the UI
+      mutate(
+        (currentPosts?: FirebasePost[]) => {
+          if (!currentPosts) return currentPosts;
+          return currentPosts.map(post => {
+            if (post.id === postId) {
+              const hasLiked = post.likes.includes(user.id);
+              return {
+                ...post,
+                likes: hasLiked 
+                  ? post.likes.filter(id => id !== user.id)
+                  : [...post.likes, user.id]
+              };
+            }
+            return post;
+          });
+        },
+        false // Don't revalidate immediately
+      );
+
+      // Update Firestore in the background
+      const postRef = doc(db, "posts", postId);
+      const postDoc = await getDoc(postRef);
+      
+      if (!postDoc.exists()) return;
+
+      const data = postDoc.data();
+      const currentLikes = Array.isArray(data.likes) ? data.likes : [];
+      const hasLiked = currentLikes.includes(user.id);
+
+      await updateDoc(postRef, {
+        likes: hasLiked
+          ? currentLikes.filter((id: string) => id !== user.id)
+          : [...currentLikes, user.id]
+      });
+
+      // Revalidate after the update to ensure consistency
+      await mutate();
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      // If there's an error, revalidate to restore the correct state
+      await mutate();
+    }
+  };
+
+  const handleAddComment = async (postId: string) => {
+    if (!user || !newComment.trim()) return;
+    console.log("Adding comment to post:", postId);
+    setIsSubmittingComment(true);
+
+    try {
+      // Primero obtenemos el número de apartamento actualizado del usuario
+      const userDoc = await getDoc(doc(db, "users", user.id));
+      const userAptNumber = userDoc.exists() ? userDoc.data().aptNumber : "Not set";
+
+      const postRef = doc(db, "posts", postId);
+      const newCommentData: Comment = {
+        id: crypto.randomUUID(),
+        author: {
+          name: user.name,
+          avatar: user.avatar,
+          initials: user.initials,
+          aptNumber: userAptNumber,  // Usamos el número de apartamento obtenido de Firestore
+        },
+        content: newComment.trim(),
+        timestamp: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
+      };
+
+      await updateDoc(postRef, {
+        comments: arrayUnion(newCommentData)
+      });
+
+      setNewComment("");
+      await mutate();
+    } catch (error) {
+      console.error("Error adding comment:", error);
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
@@ -391,18 +523,79 @@ export default function FeedPage() {
             </CardContent>
             <CardFooter className="border-t p-4">
               <div className="flex space-x-6">
-                <Button variant="ghost" size="sm" className="space-x-2">
-                  <ThumbsUp className="h-4 w-4" />
-                  <span>{post.likes}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`space-x-2 ${post.likes?.includes(user?.id || '') ? 'text-indigo-600' : ''}`}
+                  onClick={() => handleLike(post.id)}
+                >
+                  <ThumbsUp className={`h-4 w-4 ${post.likes?.includes(user?.id || '') ? 'fill-current' : ''}`} />
+                  <span>{Array.isArray(post.likes) ? post.likes.length : 0}</span>
                 </Button>
-                <Button variant="ghost" size="sm" className="space-x-2">
-                  <MessageCircle className="h-4 w-4" />
-                  <span>{post.comments}</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="space-x-2">
-                  <Share2 className="h-4 w-4" />
-                  <span>Share</span>
-                </Button>
+
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="space-x-2"
+                      onClick={() => setSelectedPost(post)}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      <span>{Array.isArray(post.comments) ? post.comments.length : 0}</span>
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-lg">
+                    <SheetHeader>
+                      <SheetTitle>Comments</SheetTitle>
+                    </SheetHeader>
+                    <div className="flex flex-col h-full">
+                      <ScrollArea className="flex-1 pr-4 -mr-4">
+                        <div className="space-y-4 py-4">
+                          {Array.isArray(post.comments) && post.comments.map((comment) => (
+                            <div key={comment.id} className="flex space-x-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={comment.author?.avatar || ''} />
+                                <AvatarFallback>{comment.author?.initials || 'AN'}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium">{comment.author?.name || 'Anonymous'}</span>
+                                  <span className="text-sm text-gray-500">APT {comment.author?.aptNumber || 'Not set'}</span>
+                                </div>
+                                <p className="text-sm text-gray-700 mt-1">{comment.content || ''}</p>
+                                <span className="text-xs text-gray-500 mt-1">
+                                  {format(new Date(comment.timestamp || new Date()), 'MMM d, yyyy h:mm a')}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      <div className="border-t pt-4 mt-auto">
+                        <div className="flex space-x-2">
+                          <Textarea
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder="Write a comment..."
+                            className="min-h-[80px]"
+                          />
+                          <Button 
+                            onClick={() => handleAddComment(post.id)}
+                            disabled={!newComment.trim() || isSubmittingComment}
+                            className="self-end"
+                          >
+                            {isSubmittingComment ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Post'
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </div>
             </CardFooter>
           </Card>

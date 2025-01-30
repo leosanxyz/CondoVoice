@@ -1,0 +1,11 @@
+---
+description: This rule prevents warnings from the building phase on Vercel
+globs: 
+---
+When unused code is detected:
+
+First: Suggest deleting truly redundant items
+
+Second: Offer to add // TODO: Remove if unused by [date] comments for uncertain cases
+
+Third: Proactively update type definitions/prop types if removal impacts interfaces
