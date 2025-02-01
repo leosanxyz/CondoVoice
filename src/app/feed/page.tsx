@@ -20,16 +20,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// @ts-ignore
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// @ts-ignore
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus,
   ThumbsUp,
   MessageCircle,
-  Share2,
   Loader2,
   AlertTriangle,
   Calendar,
@@ -187,7 +184,6 @@ export default function FeedPage() {
   const [newPostContent, setNewPostContent] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isPoll, setIsPoll] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<PollOption[]>([
     { label: "", votes: 0 },
@@ -386,7 +382,7 @@ export default function FeedPage() {
 
       // Reseteamos estado
       setNewPostContent("");
-      setIsPoll(false);
+      setIsPollPost(false);
       setPollQuestion("");
       setPollOptions([
         { label: "", votes: 0 },
@@ -396,7 +392,6 @@ export default function FeedPage() {
       setPostUrgency("");
       setEventDate("");
       setLocation("");
-      setIsPollPost(false);
       setIsDialogOpen(false);
     } catch (error) {
       console.error("Error creating post:", error);

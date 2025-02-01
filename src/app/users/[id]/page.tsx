@@ -23,11 +23,9 @@ export default function UserProfile() {
   const { id } = useParams();
   const [resident, setResident] = useState<Resident | null>(null);
 
-  if (!id || typeof id !== 'string') {
-    return <div className="container mx-auto px-4 py-8">Invalid user id</div>;
-  }
-
   useEffect(() => {
+    if (!id || typeof id !== 'string') return;
+
     const fetchResident = async () => {
       const docRef = doc(db, 'users', id);
       const docSnap = await getDoc(docRef);
@@ -46,6 +44,10 @@ export default function UserProfile() {
 
     fetchResident();
   }, [id]);
+
+  if (!id || typeof id !== 'string') {
+    return <div className="container mx-auto px-4 py-8">Invalid user id</div>;
+  }
 
   if (!resident) {
     return <div className="container mx-auto px-4 py-8">Loading...</div>;
