@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Home, Mail, Phone } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
+import { Button } from "@/components/ui/button";
 
 interface Resident {
   id: string;
@@ -115,6 +116,14 @@ export default function DirectoryPage() {
                             <Phone className="h-4 w-4 mr-2" />
                             {resident.phone}
                           </div>
+                        </div>
+                        <div className="flex justify-end mt-2 space-x-2">
+                          <a href={`https://api.whatsapp.com/send?phone=${resident.phone}`} target="_blank" rel="noopener noreferrer">
+                            <Button className="bg-green-500 text-white">WhatsApp</Button>
+                          </a>
+                          <a href={`/users/${resident.id}`}>
+                            <Button variant="outline">View Profile</Button>
+                          </a>
                         </div>
                       </div>
                     </CardContent>
