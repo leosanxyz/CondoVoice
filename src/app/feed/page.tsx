@@ -18,11 +18,26 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+// @ts-ignore
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// @ts-ignore
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus,
   ThumbsUp,
   MessageCircle,
+  Share2,
   Loader2,
+  AlertTriangle,
+  Calendar,
+  HelpCircle,
+  Users,
+  PenToolIcon as Tool,
+  Megaphone,
+  MapPin
 } from "lucide-react";
 import { db } from "@/lib/firebaseConfig";
 import {
@@ -42,18 +57,9 @@ import {
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import useSWR from "swr";
 import { usePullToRefresh } from "use-pull-to-refresh";
-import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 /* ------------------------------------------------------------
    Tipos e interfaces
@@ -111,6 +117,10 @@ interface FirebasePost {
   likes: string[]; // Array of user IDs who liked the post
   comments: Comment[];
   poll?: Poll;
+  category: string;
+  urgency: string;
+  eventDate: string;
+  location: string;
 }
 
 /**
@@ -135,6 +145,10 @@ interface NewPostData {
     options: PollOption[];
     active: boolean;
   };
+  category: string;
+  urgency: string;
+  eventDate: string;
+  location: string;
 }
 
 interface RawComment {
@@ -150,6 +164,24 @@ interface RawComment {
   timestamp?: string | { toDate(): Date };
 }
 
+// Helper function to get category icon
+function getCategoryIcon(category: string) {
+  switch (category) {
+    case "maintenance":
+      return <Tool className="h-4 w-4" />;
+    case "event":
+      return <Calendar className="h-4 w-4" />;
+    case "question":
+      return <HelpCircle className="h-4 w-4" />;
+    case "social":
+      return <Users className="h-4 w-4" />;
+    case "announcement":
+      return <Megaphone className="h-4 w-4" />;
+    default:
+      return null;
+  }
+}
+
 export default function FeedPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
@@ -163,6 +195,13 @@ export default function FeedPage() {
   ]);
   const [newComment, setNewComment] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  // New state for additional fields
+  const [postCategory, setPostCategory] = useState("");
+  const [postUrgency, setPostUrgency] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [location, setLocation] = useState("");
+  const [isPollPost, setIsPollPost] = useState(false);
 
   /* ------------------------------------------------------------
      Carga de POSTS
@@ -218,6 +257,10 @@ export default function FeedPage() {
           likes: Array.isArray(data.likes) ? data.likes : [],
           comments,
           poll: data.poll,
+          category: data.category || "",
+          urgency: data.urgency || "",
+          eventDate: data.eventDate || "",
+          location: data.location || ""
         };
       }));
 
@@ -283,7 +326,6 @@ export default function FeedPage() {
   };
 
   const removePollOption = (index: number) => {
-    // Mantenemos un mínimo de 2 opciones
     if (pollOptions.length > 2) {
       setPollOptions((prev) => prev.filter((_, i) => i !== index));
     }
@@ -304,7 +346,7 @@ export default function FeedPage() {
     const userDoc = await getDoc(doc(db, "users", user.id));
     const userData = userDoc.exists() ? userDoc.data() : null;
 
-    // Definimos el tipo exacto del nuevo Post
+    // Build the new post object with additional fields
     const newPost: NewPostData = {
       author: {
         id: user.id,
@@ -318,13 +360,17 @@ export default function FeedPage() {
       timestamp: serverTimestamp(),
       likes: [], // Initialize empty array for likes
       comments: [], // Initialize empty array for comments
+      category: postCategory,
+      urgency: postCategory === "maintenance" ? postUrgency : "",
+      eventDate: postCategory === "event" ? eventDate : "",
+      location: (postCategory === "event" || postCategory === "maintenance") ? location : "",
     };
 
     // Si creamos una Poll válida, se la anexamos
     const validPollOptions = pollOptions.filter((opt) =>
       opt.label.trim()
     );
-    if (isPoll && pollQuestion.trim() && validPollOptions.length >= 2) {
+    if (isPollPost && pollQuestion.trim() && validPollOptions.length >= 2) {
       newPost.poll = {
         question: pollQuestion.trim(),
         options: validPollOptions,
@@ -346,6 +392,11 @@ export default function FeedPage() {
         { label: "", votes: 0 },
         { label: "", votes: 0 },
       ]);
+      setPostCategory("");
+      setPostUrgency("");
+      setEventDate("");
+      setLocation("");
+      setIsPollPost(false);
       setIsDialogOpen(false);
     } catch (error) {
       console.error("Error creating post:", error);
@@ -524,52 +575,67 @@ export default function FeedPage() {
                 <span className="font-semibold">{post.author.name}</span>
                 <div className="flex items-center space-x-2 text-sm text-gray-500">
                   <span>{post.timestamp}</span>
-                  <span>•</span>
-                  <span>APT {post.author.aptNumber}</span>
+                  {post.author.aptNumber && (
+                    <>
+                      <span>•</span>
+                      <span>APT {post.author.aptNumber}</span>
+                    </>
+                  )}
                 </div>
               </div>
+              {post.category && (
+                <div className="ml-auto flex items-center space-x-1 bg-gray-100 rounded-full px-3 py-1">
+                  {getCategoryIcon(post.category)}
+                  <span className="text-xs capitalize">{post.category}</span>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-gray-700">{post.content}</p>
-              {post.poll && (
-                <div className="mt-4 space-y-4">
-                  <p className="font-semibold">{post.poll.question}</p>
-                  <div className="space-y-2">
-                    {post.poll.options.map((option, index) => {
-                      const totalVotes = post.poll!.options.reduce(
-                        (acc, opt) => acc + opt.votes,
-                        0
-                      );
-                      const percentage =
-                        totalVotes > 0
-                          ? (option.votes / totalVotes) * 100
-                          : 0;
+              {post.urgency && (
+                <div className="mt-2 flex items-center space-x-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm font-medium text-yellow-500">Urgency: {post.urgency}</span>
+                </div>
+              )}
+              {post.eventDate && (
+                <div className="mt-2 flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm">Event Date: {post.eventDate}</span>
+                </div>
+              )}
+              {post.location && (
+                <div className="mt-2 flex items-center space-x-2">
+                  <MapPin className="h-4 w-4 text-green-500" />
+                  <span className="text-sm">Location: {post.location}</span>
+                </div>
+              )}
+              {post.poll?.options && (
+                <div className="mt-4 space-y-2">
+                  {post.poll.options.map((option, index) => {
+                    const totalVotes = post.poll?.options.reduce((acc, opt) => acc + opt.votes, 0) || 0;
+                    const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
 
-                      return (
-                        <div key={index} className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              name={`poll-${post.id}`}
-                              onChange={() => handleVote(post.id, index)}
-                              className="h-4 w-4"
-                            />
-                            <span>{option.label}</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                            <div
-                              className="h-full bg-indigo-600"
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {option.votes} votes (
-                            {percentage.toFixed(1)}%)
-                          </div>
+                    return (
+                      <div key={index} className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            name={`poll-${post.id}`}
+                            onChange={() => handleVote(post.id, index)}
+                            className="h-4 w-4"
+                          />
+                          <span>{option.label}</span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                          <div className="h-full bg-indigo-600" style={{ width: `${percentage}%` }} />
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {option.votes} votes ({percentage.toFixed(1)}%)
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -585,23 +651,18 @@ export default function FeedPage() {
                   <span>{Array.isArray(post.likes) ? post.likes.length : 0}</span>
                 </Button>
 
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="space-x-2"
-                    >
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="space-x-2">
                       <MessageCircle className="h-4 w-4" />
                       <span>{post.comments?.length || 0}</span>
                     </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-full sm:max-w-lg">
-                    <SheetHeader>
-                      <SheetTitle>Post Details</SheetTitle>
-                    </SheetHeader>
-                    <div className="flex flex-col h-full">
-                      {/* Post Preview */}
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[525px]">
+                    <DialogHeader>
+                      <DialogTitle>Comments</DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-4">
                       <div className="border-b pb-4">
                         <div className="flex items-center space-x-4">
                           <Avatar className={cn(
@@ -621,61 +682,49 @@ export default function FeedPage() {
                             <div className="font-semibold">{post.author.name}</div>
                             <div className="text-sm text-gray-500">
                               <span>{post.timestamp}</span>
-                              <span> • </span>
-                              <span>APT {post.author.aptNumber}</span>
+                              {post.author.aptNumber && (
+                                <>
+                                  <span> • </span>
+                                  <span>APT {post.author.aptNumber}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
                         <p className="mt-3 text-gray-700">{post.content}</p>
-                        <div className="mt-4 flex items-center space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className={`space-x-2 ${post.likes?.includes(user?.id || '') ? 'text-indigo-600' : ''}`}
-                            onClick={() => handleLike(post.id)}
-                          >
-                            <ThumbsUp className={`h-4 w-4 ${post.likes?.includes(user?.id || '') ? 'fill-current' : ''}`} />
-                            <span>{Array.isArray(post.likes) ? post.likes.length : 0}</span>
-                          </Button>
-                        </div>
                       </div>
-
-                      <div className="py-4 border-b">
-                        <h2 className="font-semibold text-lg">Comments</h2>
-                      </div>
-
-                      <ScrollArea className="flex-1 pr-4 -mr-4">
-                        <div className="space-y-4 py-4">
-                          {post.comments?.map((comment) => (
-                            <div key={comment.id} className="flex space-x-3">
-                              <Avatar className={cn(
-                                "h-8 w-8 overflow-visible",
-                                comment.author.isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : undefined
-                              )}>
-                                <AvatarImage 
-                                  src={comment.author.avatar} 
-                                  className={cn(
-                                    "object-contain",
-                                    comment.author.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
-                                  )}
-                                />
-                                <AvatarFallback>{comment.author.initials}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2">
-                                  <span className="font-medium">{comment.author.name}</span>
-                                  <span className="text-sm text-gray-500">APT {comment.author.aptNumber}</span>
-                                </div>
-                                <p className="text-sm text-gray-700 mt-1">{comment.content}</p>
-                                <span className="text-xs text-gray-500 mt-1">
-                                  {format(new Date(comment.timestamp), 'MMM d, yyyy h:mm a')}
-                                </span>
+                      
+                      <div className="max-h-[300px] overflow-y-auto py-4 space-y-4">
+                        {post.comments?.map((comment) => (
+                          <div key={comment.id} className="flex space-x-3">
+                            <Avatar className={cn(
+                              "h-8 w-8 overflow-visible",
+                              comment.author.isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : undefined
+                            )}>
+                              <AvatarImage 
+                                src={comment.author.avatar} 
+                                className={cn(
+                                  "object-contain",
+                                  comment.author.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                                )}
+                              />
+                              <AvatarFallback>{comment.author.initials}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium">{comment.author.name}</span>
+                                <span className="text-sm text-gray-500">APT {comment.author.aptNumber}</span>
                               </div>
+                              <p className="text-sm text-gray-700 mt-1">{comment.content}</p>
+                              <span className="text-xs text-gray-500 mt-1">
+                                {format(new Date(comment.timestamp), 'MMM d, yyyy h:mm a')}
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                      <div className="border-t pt-4 mt-auto pb-6">
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="border-t pt-4 mt-4">
                         <div className="flex space-x-2">
                           <Textarea
                             value={newComment}
@@ -697,8 +746,8 @@ export default function FeedPage() {
                         </div>
                       </div>
                     </div>
-                  </SheetContent>
-                </Sheet>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardFooter>
           </Card>
@@ -737,73 +786,114 @@ export default function FeedPage() {
                   className="min-h-[120px] resize-none border-0 bg-transparent p-0 text-lg focus:ring-0"
                 />
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="isPoll"
-                    checked={isPoll}
-                    onChange={(e) => setIsPoll(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                  <Label htmlFor="isPoll">Create a poll</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="post-category">Category</Label>
+                  <Select value={postCategory} onValueChange={setPostCategory}>
+                    <SelectTrigger id="post-category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="event">Event</SelectItem>
+                      <SelectItem value="question">Question</SelectItem>
+                      <SelectItem value="social">Social</SelectItem>
+                      <SelectItem value="announcement">Announcement</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {isPoll && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="poll-question">Poll Question</Label>
-                      <input
-                        type="text"
-                        id="poll-question"
-                        value={pollQuestion}
-                        onChange={(e) =>
-                          setPollQuestion(e.target.value)
-                        }
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                        placeholder="Ask a question..."
-                      />
-                    </div>
+                {postCategory === "maintenance" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="post-urgency">Urgency</Label>
+                    <RadioGroup id="post-urgency" value={postUrgency} onValueChange={setPostUrgency}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="low" id="urgency-low" />
+                        <Label htmlFor="urgency-low">Low</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="medium" id="urgency-medium" />
+                        <Label htmlFor="urgency-medium">Medium</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="high" id="urgency-high" />
+                        <Label htmlFor="urgency-high">High</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
 
-                    <div className="space-y-2">
-                      <Label>Options</Label>
-                      {pollOptions.map((option, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center space-x-2"
-                        >
-                          <input
-                            type="text"
-                            value={option.label}
-                            onChange={(e) =>
-                              handlePollOptionChange(
-                                index,
-                                e.target.value
-                              )
-                            }
-                            className="flex-1 rounded-md border border-gray-300 px-3 py-2"
-                            placeholder={`Option ${index + 1}`}
-                          />
-                          {pollOptions.length > 2 && (
-                            <button
-                              onClick={() => removePollOption(index)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {pollOptions.length < 6 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={addPollOption}
-                          className="mt-2"
-                        >
-                          Add Option
-                        </Button>
-                      )}
-                    </div>
+                {postCategory === "event" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="event-date">Event Date</Label>
+                    <Input id="event-date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+                  </div>
+                )}
+
+                {(postCategory === "event" || postCategory === "maintenance") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      placeholder="Enter location"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is-poll"
+                    checked={isPollPost}
+                    onCheckedChange={(checked) => setIsPollPost(checked as boolean)}
+                  />
+                  <Label htmlFor="is-poll">Create a poll</Label>
+                </div>
+
+                {isPollPost && (
+                  <div className="space-y-2">
+                    <Label htmlFor="poll-question">Poll Question</Label>
+                    <input
+                      type="text"
+                      id="poll-question"
+                      value={pollQuestion}
+                      onChange={(e) => setPollQuestion(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      placeholder="Ask a question..."
+                    />
+                  </div>
+                )}
+
+                {isPollPost && (
+                  <div className="space-y-2">
+                    <Label>Options</Label>
+                    {pollOptions.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          placeholder={`Option ${index + 1}`}
+                          value={option.label}
+                          onChange={(e) => handlePollOptionChange(index, e.target.value)}
+                        />
+                        {pollOptions.length > 2 && (
+                          <button
+                            onClick={() => removePollOption(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {pollOptions.length < 6 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addPollOption}
+                        className="mt-2"
+                      >
+                        Add Option
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -820,8 +910,8 @@ export default function FeedPage() {
               <Button
                 onClick={handleCreatePost}
                 disabled={
-                  (!newPostContent.trim() && !isPoll) ||
-                  (isPoll &&
+                  (!newPostContent.trim() && !isPollPost) ||
+                  (isPollPost &&
                     (!pollQuestion.trim() ||
                       pollOptions.filter((opt) => opt.label.trim())
                         .length < 2))
