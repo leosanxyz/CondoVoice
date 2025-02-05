@@ -77,6 +77,19 @@ interface TextRotateRef {
   reset: () => void;
 }
 
+// Add these styles to maintain consistent height for inputs
+const inputStyles = "min-h-[24px] h-[24px]"; // Fixed height for inputs
+const textareaStyles = "min-h-[80px] h-[80px]"; // Fixed height for textarea
+
+// Add this helper function at the top of the file
+const getLighterColor = (hexColor: string) => {
+  // Convert hex to RGB and make it lighter
+  const r = Math.min(255, parseInt(hexColor.slice(1,3), 16) + 20);
+  const g = Math.min(255, parseInt(hexColor.slice(3,5), 16) + 20);
+  const b = Math.min(255, parseInt(hexColor.slice(5,7), 16) + 20);
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 export default function ProfilePage() {
   const auth = getAuth();
   const currentUser = auth.currentUser;
@@ -404,10 +417,10 @@ export default function ProfilePage() {
                 name="name"
                 value={userData.name}
                 onChange={handleInputChange}
-                className="bg-transparent border-0 p-0 focus:ring-0 text-2xl font-bold text-white placeholder-white"
+                className={`bg-transparent border-0 p-0 focus:ring-0 text-2xl font-bold text-white placeholder-white ${inputStyles}`}
               />
             ) : (
-              <CardTitle className="text-2xl font-bold text-white">{userData.name}</CardTitle>
+              <CardTitle className="text-2xl font-bold text-white h-[24px]">{userData.name}</CardTitle>
             )}
             <div className="flex items-center space-x-1">
               <Mail className="h-4 w-4 text-white" />
@@ -421,10 +434,10 @@ export default function ProfilePage() {
                   name="phone"
                   value={userData.phone}
                   onChange={handleInputChange}
-                  className="bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white"
+                  className={`bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white ${inputStyles}`}
                 />
               ) : (
-                <span className="text-sm text-white/90">{userData.phone}</span>
+                <span className="text-sm text-white/90 h-[24px]">{userData.phone}</span>
               )}
             </div>
             <div className="flex items-center space-x-1">
@@ -435,10 +448,10 @@ export default function ProfilePage() {
                   name="aptNumber"
                   value={userData.aptNumber}
                   onChange={handleInputChange}
-                  className="bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white"
+                  className={`bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white ${inputStyles}`}
                 />
               ) : (
-                <span className="text-sm text-white/90">{userData.aptNumber}</span>
+                <span className="text-sm text-white/90 h-[24px]">{userData.aptNumber}</span>
               )}
             </div>
           </div>
@@ -461,7 +474,7 @@ export default function ProfilePage() {
                     value={userData.emergencyContact}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className="resize-none bg-transparent text-white placeholder-white border-white/20 focus:border-white"
+                    className={`resize-none bg-transparent text-white placeholder-white border-white/20 focus:border-white ${textareaStyles}`}
                   />
                 </div>
               </div>
@@ -475,7 +488,7 @@ export default function ProfilePage() {
                 onClick={handleCustomizeButtonClick}
                 className="hover:opacity-90 transition-opacity"
                 style={{ 
-                  backgroundColor: `color-mix(in srgb, ${selectedColor} 70%, white 30%)` 
+                  backgroundColor: getLighterColor(selectedColor)
                 }}
               >
                 <TextRotate
