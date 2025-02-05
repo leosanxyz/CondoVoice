@@ -3,13 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarDays, Home, Car, Mail, Phone, PawPrint, AlertTriangle, Camera, Loader2, Smile, Star } from 'lucide-react';
+import { Mail, Phone, Home, AlertTriangle, Camera, Loader2, Smile, Star } from 'lucide-react';
 import { getAuth, updateProfile } from 'firebase/auth';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -17,9 +16,8 @@ import { storage, db } from '@/lib/firebaseConfig';
 import dynamic from 'next/dynamic';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { LayoutGroup, motion } from "motion/react"
-import TextRotate from "@/components/fancy/text-rotate"
+import TextRotate, { TextRotateRef } from "@/components/fancy/text-rotate"
 
 // Preload emoji picker immediately
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
@@ -69,14 +67,6 @@ const BUTTON_STATES = {
   DONE: "Done"
 };
 
-// Add this interface at the top with your other interfaces
-interface TextRotateRef {
-  next: () => void;
-  previous: () => void;
-  jumpTo: (index: number) => void;
-  reset: () => void;
-}
-
 // Add these styles to maintain consistent height for inputs
 const inputStyles = "min-h-[24px] h-[24px]"; // Fixed height for inputs
 const textareaStyles = "min-h-[80px] h-[80px]"; // Fixed height for textarea
@@ -97,7 +87,6 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [buttonTextIndex, setButtonTextIndex] = useState(0);
   const [userData, setUserData] = useState<UserData>({
     name: '',
     email: '',
@@ -117,14 +106,13 @@ export default function ProfilePage() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [shouldRenderColorPicker, setShouldRenderColorPicker] = useState(false);
   const [isPickerMuted, setIsPickerMuted] = useState(false);
-  const [selectedColorAnimation, setSelectedColorAnimation] = useState<string | null>(null);
   const [showingStar, setShowingStar] = useState<string | null>(null);
 
   // Add our new buttonState.
   const [buttonState, setButtonState] = useState(BUTTON_STATES.CUSTOMIZE);
 
   // Add ref for TextRotate
-  const textRotateRef = useRef<{ next: () => void }>(null);
+  const textRotateRef = useRef<TextRotateRef>(null);
 
   useEffect(() => {
     const loadUserData = async () => {
