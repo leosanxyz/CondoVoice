@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarDays, Home, Car, Mail, Phone, PawPrint, AlertTriangle, Camera, Loader2, Smile } from 'lucide-react';
+import { CalendarDays, Home, Car, Mail, Phone, PawPrint, AlertTriangle, Camera, Loader2, Smile, Star } from 'lucide-react';
 import { getAuth, updateProfile } from 'firebase/auth';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -17,6 +17,7 @@ import { storage, db } from '@/lib/firebaseConfig';
 import dynamic from 'next/dynamic';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 // Preload emoji picker immediately
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
@@ -48,7 +49,16 @@ interface UserData {
   emergencyContact: string;
   avatar: string;
   isEmojiAvatar?: boolean;
+  cardColor?: string;
 }
+
+// Replace the colorOptions array with the new colors
+const colorOptions = [
+  '#FF2C60', '#FE319B', '#EC33F7', '#9E4FFF', '#5946F8',
+  '#0881FF', '#00A9EE', '#06B2FF', '#00BEC9', '#07BC7D',
+  '#00CA48', '#6DCD04', '#F4B004', '#FF9803', '#FF6800',
+  '#FF2A3A', '#D2B14F', '#CF894A', '#00346A', '#1A1A1A'
+];
 
 export default function ProfilePage() {
   const auth = getAuth();
@@ -68,7 +78,16 @@ export default function ProfilePage() {
     emergencyContact: '',
     avatar: '/placeholder.svg',
     isEmojiAvatar: false,
+    cardColor: '#00BFFF',
   });
+
+  // New state for card color customization
+  const [selectedColor, setSelectedColor] = useState(userData.cardColor || "#00BFFF");
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [shouldRenderColorPicker, setShouldRenderColorPicker] = useState(false);
+  const [isPickerMuted, setIsPickerMuted] = useState(false);
+  const [selectedColorAnimation, setSelectedColorAnimation] = useState<string | null>(null);
+  const [showingStar, setShowingStar] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -84,13 +103,16 @@ export default function ProfilePage() {
             email: currentUser.email || '',
             avatar: data.avatar || currentUser.photoURL || '/placeholder.svg',
             isEmojiAvatar: data.isEmojiAvatar || false,
+            cardColor: data.cardColor || '#00BFFF',
           }));
+          setSelectedColor(data.cardColor || '#00BFFF');
         } else {
           setUserData(prevData => ({
             ...prevData,
             name: currentUser.displayName || 'Anonymous',
             email: currentUser.email || '',
             avatar: currentUser.photoURL || '/placeholder.svg',
+            cardColor: '#00BFFF',
           }));
         }
       }
@@ -214,9 +236,88 @@ export default function ProfilePage() {
     }
   };
 
+  // Function to open the color picker with fade in
+  const openColorPicker = () => {
+    setShouldRenderColorPicker(true);
+    requestAnimationFrame(() => {
+      setShowColorPicker(true);
+    });
+  };
+
+  // Function to close the color picker with fade out
+  const closeColorPicker = () => {
+    setShowColorPicker(false);
+    setTimeout(() => {
+      setShouldRenderColorPicker(false);
+    }, 300); // matches the transition duration
+  };
+
+  // Update handleCustomizeButtonClick function
+  const handleCustomizeButtonClick = () => {
+    if (isEditing) {
+      // If we're editing and click "Done", disable editing and unmute colors
+      setIsEditing(false);
+      setIsPickerMuted(false);
+    } else if (shouldRenderColorPicker) {
+      // If picker is open and we click "Edit Information", enable editing and mute colors
+      setIsPickerMuted(true);
+      setIsEditing(true);
+    } else {
+      // Initial state: open picker with full opacity
+      setIsPickerMuted(false);
+      openColorPicker();
+    }
+  };
+
+  // Update the handleColorClick function to check if editing
+  const handleColorClick = async (color: string) => {
+    if (isEditing) return; // Don't allow color changes while editing
+    if (showingStar === color) return; // Don't re-trigger if same color
+    
+    setSelectedColor(color);
+    setShowingStar(color);
+
+    // Save the color to Firestore
+    if (currentUser) {
+      try {
+        await setDoc(doc(db, 'users', currentUser.uid), {
+          cardColor: color
+        }, { merge: true });
+        
+        // Update local state
+        setUserData(prev => ({
+          ...prev,
+          cardColor: color
+        }));
+      } catch (error) {
+        console.error('Error saving color:', error);
+      }
+    }
+  };
+
+  // Update the styles for animations
+  const styles = `
+    @keyframes fadeOut {
+      0% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0; transform: scale(0.8); }
+    }
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.2); }
+    }
+    .animate-fade-out {
+      animation: fadeOut 0.3s ease-out forwards;
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-in forwards;
+    }
+  `;
+
   return (
     <div className="container mx-auto px-4 py-1 md:py-8 pb-36 max-w-2xl">
-      <Card className="mt-2 md:mt-0">
+      <style>{styles}</style>
+      {/* Apply selectedColor as background color for the card */}
+      <Card style={{ backgroundColor: selectedColor }} className="mt-2 md:mt-0">
         <CardHeader className="flex flex-row items-center space-x-4 pb-2">
           <div className="relative">
             <Avatar className={cn(
@@ -267,9 +368,50 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-          <div className="flex flex-col space-y-1.5">
-            <CardTitle className="text-2xl font-bold">{userData.name}</CardTitle>
-            <CardDescription>Manage your CondoVoice profile information</CardDescription>
+          <div className="flex flex-col space-y-1">
+            {isEditing ? (
+              <Input
+                id="name"
+                name="name"
+                value={userData.name}
+                onChange={handleInputChange}
+                className="bg-transparent border-0 p-0 focus:ring-0 text-2xl font-bold text-white placeholder-white"
+              />
+            ) : (
+              <CardTitle className="text-2xl font-bold text-white">{userData.name}</CardTitle>
+            )}
+            <div className="flex items-center space-x-1">
+              <Mail className="h-4 w-4 text-white" />
+              <span className="text-sm text-white/90">{userData.email}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Phone className="h-4 w-4 text-white" />
+              {isEditing ? (
+                <Input
+                  id="phone"
+                  name="phone"
+                  value={userData.phone}
+                  onChange={handleInputChange}
+                  className="bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white"
+                />
+              ) : (
+                <span className="text-sm text-white/90">{userData.phone}</span>
+              )}
+            </div>
+            <div className="flex items-center space-x-1">
+              <Home className="h-4 w-4 text-white" />
+              {isEditing ? (
+                <Input
+                  id="aptNumber"
+                  name="aptNumber"
+                  value={userData.aptNumber}
+                  onChange={handleInputChange}
+                  className="bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white"
+                />
+              ) : (
+                <span className="text-sm text-white/90">{userData.aptNumber}</span>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -279,112 +421,18 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              <Tabs defaultValue="personal" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                  <TabsTrigger value="residence">Residence Info</TabsTrigger>
-                </TabsList>
-                <TabsContent value="personal">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <div className="flex items-center space-x-2">
-                        <Mail className="h-4 w-4 text-gray-500" />
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          value={userData.email}
-                          disabled={true}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone</Label>
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        <Input
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          value={userData.phone}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="residence">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="aptNumber">Apartment Number</Label>
-                      <div className="flex items-center space-x-2">
-                        <Home className="h-4 w-4 text-gray-500" />
-                        <Input
-                          id="aptNumber"
-                          name="aptNumber"
-                          value={userData.aptNumber}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="residentSince">Resident Since</Label>
-                      <div className="flex items-center space-x-2">
-                        <CalendarDays className="h-4 w-4 text-gray-500" />
-                        <Input
-                          id="residentSince"
-                          name="residentSince"
-                          type="date"
-                          value={userData.residentSince}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="parkingSpot">Parking Spot</Label>
-                      <div className="flex items-center space-x-2">
-                        <Car className="h-4 w-4 text-gray-500" />
-                        <Input
-                          id="parkingSpot"
-                          name="parkingSpot"
-                          value={userData.parkingSpot}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="petInfo">Pet Information</Label>
-                      <div className="flex items-center space-x-2">
-                        <PawPrint className="h-4 w-4 text-gray-500" />
-                        <Input
-                          id="petInfo"
-                          name="petInfo"
-                          value={userData.petInfo}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
               <Separator className="my-6" />
               <div className="space-y-2">
-                <Label htmlFor="emergencyContact">Emergency Contact</Label>
+                <Label htmlFor="emergencyContact" className="text-white">Emergency Info</Label>
                 <div className="flex items-center space-x-2">
-                  <AlertTriangle className="h-4 w-4 text-gray-500" />
+                  <AlertTriangle className="h-4 w-4 text-white" />
                   <Textarea
                     id="emergencyContact"
                     name="emergencyContact"
                     value={userData.emergencyContact}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className="resize-none"
+                    className="resize-none bg-transparent text-white placeholder-white border-white/20 focus:border-white"
                   />
                 </div>
               </div>
@@ -393,19 +441,53 @@ export default function ProfilePage() {
         </CardContent>
         <CardFooter className="flex justify-between">
           {isEditing ? (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isUpdating}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={isUpdating}>
-                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
-              </Button>
-            </>
+            <Button onClick={handleCustomizeButtonClick}>
+              Done
+            </Button>
           ) : (
-            <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
+            <Button onClick={handleCustomizeButtonClick}>
+              {shouldRenderColorPicker ? 'Edit Information' : 'Customize'}
+            </Button>
           )}
         </CardFooter>
       </Card>
+
+      {/* Inline Color Picker below the card with fade transition */}
+      {shouldRenderColorPicker && (
+        <div className={`mt-4 p-4 bg-white border border-gray-200 rounded transition-opacity duration-300 ${showColorPicker ? "opacity-100" : "opacity-0"}`}> 
+          <h2 className="text-xl font-bold mb-2">Select Card Color</h2>
+          <div className="grid grid-cols-5 md:grid-cols-10 gap-4">
+            {colorOptions.map((color) => (
+              <button
+                key={color}
+                className={`w-full pt-[100%] rounded-full relative transition-opacity ${
+                  isPickerMuted ? 'opacity-30 cursor-not-allowed' : 'opacity-100 cursor-pointer'
+                } ${selectedColor === color ? 'ring-4 ring-white' : ''}`}
+                style={{ backgroundColor: color }}
+                onClick={() => handleColorClick(color)}
+              >
+                {selectedColor === color && (
+                  <div className={`absolute inset-0 flex items-center justify-center ${
+                    showingStar === color ? 'animate-fade-in' : 'animate-fade-out'
+                  }`}>
+                    <Star className="w-6 h-6 text-white" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              className={`text-white hover:opacity-90 transition-opacity ${isPickerMuted ? 'opacity-30 cursor-not-allowed' : ''}`}
+              style={{ backgroundColor: selectedColor }}
+              onClick={() => { setIsEditing(true); closeColorPicker(); }}
+              disabled={isPickerMuted}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
