@@ -355,20 +355,31 @@ export default function ProfilePage() {
               "h-16 w-16 overflow-visible transition-all duration-200",
               userData.isEmojiAvatar ? "bg-transparent border-0 !rounded-none" : undefined
             )}>
-              <AvatarImage 
-                src={userData.avatar} 
-                className={cn(
-                  "object-contain transition-all duration-200",
-                  userData.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
-                )}
-              />
-              <AvatarFallback>{userData.name ? userData.name.split(' ').map(n => n[0]).join('') : ''}</AvatarFallback>
+              {isUpdating ? (
+                <div className="flex items-center justify-center w-full h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                </div>
+              ) : (
+                <>
+                  <AvatarImage 
+                    src={userData.avatar} 
+                    className={cn(
+                      "object-contain transition-all duration-200",
+                      userData.isEmojiAvatar && "transform scale-[1.2] !rounded-none"
+                    )}
+                  />
+                  <AvatarFallback>{userData.name ? userData.name.split(' ').map(n => n[0]).join('') : ''}</AvatarFallback>
+                </>
+              )}
             </Avatar>
             {isEditing && (
               <div className="absolute -bottom-2 -right-2 flex space-x-1">
                 <Label
                   htmlFor="avatar-upload"
-                  className="rounded-full bg-primary p-1.5 text-white cursor-pointer hover:bg-primary/90"
+                  className={cn(
+                    "rounded-full bg-primary p-1.5 text-white cursor-pointer hover:bg-primary/90",
+                    isUpdating && "opacity-50 cursor-not-allowed"
+                  )}
                 >
                   <Camera className="h-4 w-4" />
                   <Input
@@ -377,6 +388,7 @@ export default function ProfilePage() {
                     accept="image/*"
                     className="hidden"
                     onChange={handleAvatarChange}
+                    disabled={isUpdating}
                   />
                 </Label>
                 <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
@@ -384,7 +396,11 @@ export default function ProfilePage() {
                     <Button
                       variant="default"
                       size="icon"
-                      className="rounded-full h-[32px] w-[32px] p-1.5"
+                      className={cn(
+                        "rounded-full h-[32px] w-[32px] p-1.5",
+                        isUpdating && "opacity-50 cursor-not-allowed"
+                      )}
+                      disabled={isUpdating}
                     >
                       <Smile className="h-4 w-4" />
                     </Button>
@@ -407,6 +423,7 @@ export default function ProfilePage() {
                 value={userData.name}
                 onChange={handleInputChange}
                 className={`bg-transparent border-0 p-0 focus:ring-0 text-2xl font-bold text-white placeholder-white ${inputStyles}`}
+                disabled={isUpdating}
               />
             ) : (
               <CardTitle className="text-2xl font-bold text-white h-[24px]">{userData.name}</CardTitle>
@@ -424,6 +441,7 @@ export default function ProfilePage() {
                   value={userData.phone}
                   onChange={handleInputChange}
                   className={`bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white ${inputStyles}`}
+                  disabled={isUpdating}
                 />
               ) : (
                 <span className="text-sm text-white/90 h-[24px]">{userData.phone}</span>
@@ -438,6 +456,7 @@ export default function ProfilePage() {
                   value={userData.aptNumber}
                   onChange={handleInputChange}
                   className={`bg-transparent border-0 p-0 focus:ring-0 text-sm text-white placeholder-white ${inputStyles}`}
+                  disabled={isUpdating}
                 />
               ) : (
                 <span className="text-sm text-white/90 h-[24px]">{userData.aptNumber}</span>
@@ -462,7 +481,7 @@ export default function ProfilePage() {
                     name="emergencyContact"
                     value={userData.emergencyContact}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
+                    disabled={!isEditing || isUpdating}
                     className={`resize-none bg-transparent text-white placeholder-white border-white/20 focus:border-white ${textareaStyles}`}
                   />
                 </div>
@@ -475,10 +494,14 @@ export default function ProfilePage() {
             <motion.div layout>
               <Button 
                 onClick={handleCustomizeButtonClick}
-                className="hover:opacity-90 transition-opacity"
+                className={cn(
+                  "hover:opacity-90 transition-opacity",
+                  isUpdating && "opacity-50 cursor-not-allowed"
+                )}
                 style={{ 
                   backgroundColor: getLighterColor(selectedColor)
                 }}
+                disabled={isUpdating}
               >
                 <TextRotate
                   ref={textRotateRef}
