@@ -278,7 +278,7 @@ export default function ProfilePage() {
   };
 
   // Update the click handler to trigger the animation
-  const handleCustomizeButtonClick = () => {
+  const handleCustomizeButtonClick = async () => {
     if (buttonState === BUTTON_STATES.CUSTOMIZE) {
       openColorPicker();
       setIsPickerMuted(false);
@@ -290,6 +290,7 @@ export default function ProfilePage() {
       setButtonState(BUTTON_STATES.DONE);
       textRotateRef.current?.next(); // Trigger animation
     } else {
+      await handleSave();
       setIsEditing(false);
       setIsPickerMuted(false);
       setShowColorPicker(false);
