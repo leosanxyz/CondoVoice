@@ -5,9 +5,9 @@ export const metadata = {
   title: "CondoVoice",
   description: "Aplicación de condominio con Next.js",
   manifest: "/manifest.json",
-  themeColor: "#4338ca",
+  themeColor: "#00BFFF",
   appleWebAppCapable: "yes",
-  appleWebAppStatusBarStyle: "default",
+  appleWebAppStatusBarStyle: "black-translucent",
   appleWebAppTitle: "CondoVoice",
   icons: {
     icon: [
@@ -31,13 +31,19 @@ export const metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "CondoVoice",
   },
   openGraph: {
     type: "website",
     title: "CondoVoice",
     description: "Aplicación de condominio con Next.js",
+  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
   },
 };
 

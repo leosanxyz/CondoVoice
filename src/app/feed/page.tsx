@@ -199,6 +199,9 @@ export default function FeedPage() {
   const [location, setLocation] = useState("");
   const [isPollPost, setIsPollPost] = useState(false);
 
+  // Add userColor to the state
+  const [userColor, setUserColor] = useState('#00BFFF');
+
   /* ------------------------------------------------------------
      Carga de POSTS
   ------------------------------------------------------------ */
@@ -277,8 +280,13 @@ export default function FeedPage() {
   ------------------------------------------------------------ */
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
+        // Get user data including color from Firestore
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.exists() ? userDoc.data() : null;
+        
         setUser({
           id: currentUser.uid,
           name: currentUser.displayName || "Anonymous",
@@ -291,6 +299,9 @@ export default function FeedPage() {
             : "AN",
           isEmojiAvatar: false,
         });
+        
+        // Set user color
+        setUserColor(userData?.cardColor || '#00BFFF');
       } else {
         setUser(null);
       }
@@ -639,7 +650,8 @@ export default function FeedPage() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className={`space-x-2 ${post.likes?.includes(user?.id || '') ? 'text-indigo-600' : ''}`}
+                  className={`space-x-2`}
+                  style={{ color: post.likes?.includes(user?.id || '') ? userColor : undefined }}
                   onClick={() => handleLike(post.id)}
                 >
                   <ThumbsUp className={`h-4 w-4 ${post.likes?.includes(user?.id || '') ? 'fill-current' : ''}`} />
@@ -754,7 +766,8 @@ export default function FeedPage() {
           <motion.button
             onClick={() => setIsDialogOpen(true)}
             whileTap={{ scale: 0.9 }}
-            className="fixed right-6 bottom-28 bg-indigo-600 text-white rounded-full p-4 shadow-lg z-50 hover:bg-indigo-700 transition-colors"
+            className="fixed right-6 bottom-32 text-white rounded-full p-4 shadow-lg z-50 hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: userColor }}
           >
             <Plus className="h-8 w-8" />
           </motion.button>

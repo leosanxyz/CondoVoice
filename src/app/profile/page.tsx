@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,8 @@ import dynamic from 'next/dynamic';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { LayoutGroup, motion } from "motion/react"
+import TextRotate from "@/components/fancy/text-rotate"
 
 // Preload emoji picker immediately
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
@@ -60,6 +62,21 @@ const colorOptions = [
   '#FF2A3A', '#D2B14F', '#CF894A', '#00346A', '#1A1A1A'
 ];
 
+// Place these constants at the top of the file (outside the component)
+const BUTTON_STATES = {
+  CUSTOMIZE: "Customize",
+  EDIT: "Edit\u00A0Information", // use a non-breaking space so it is not split
+  DONE: "Done"
+};
+
+// Add this interface at the top with your other interfaces
+interface TextRotateRef {
+  next: () => void;
+  previous: () => void;
+  jumpTo: (index: number) => void;
+  reset: () => void;
+}
+
 export default function ProfilePage() {
   const auth = getAuth();
   const currentUser = auth.currentUser;
@@ -67,6 +84,7 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [buttonTextIndex, setButtonTextIndex] = useState(0);
   const [userData, setUserData] = useState<UserData>({
     name: '',
     email: '',
@@ -88,6 +106,12 @@ export default function ProfilePage() {
   const [isPickerMuted, setIsPickerMuted] = useState(false);
   const [selectedColorAnimation, setSelectedColorAnimation] = useState<string | null>(null);
   const [showingStar, setShowingStar] = useState<string | null>(null);
+
+  // Add our new buttonState.
+  const [buttonState, setButtonState] = useState(BUTTON_STATES.CUSTOMIZE);
+
+  // Add ref for TextRotate
+  const textRotateRef = useRef<{ next: () => void }>(null);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -249,23 +273,28 @@ export default function ProfilePage() {
     setShowColorPicker(false);
     setTimeout(() => {
       setShouldRenderColorPicker(false);
-    }, 300); // matches the transition duration
+    }, 300);
   };
 
-  // Update handleCustomizeButtonClick function
+  // Update the click handler to trigger the animation
   const handleCustomizeButtonClick = () => {
-    if (isEditing) {
-      // If we're editing and click "Done", disable editing and unmute colors
-      setIsEditing(false);
+    if (buttonState === BUTTON_STATES.CUSTOMIZE) {
+      openColorPicker();
       setIsPickerMuted(false);
-    } else if (shouldRenderColorPicker) {
-      // If picker is open and we click "Edit Information", enable editing and mute colors
+      setButtonState(BUTTON_STATES.EDIT);
+      textRotateRef.current?.next(); // Trigger animation
+    } else if (buttonState === BUTTON_STATES.EDIT) {
       setIsPickerMuted(true);
       setIsEditing(true);
+      setButtonState(BUTTON_STATES.DONE);
+      textRotateRef.current?.next(); // Trigger animation
     } else {
-      // Initial state: open picker with full opacity
+      setIsEditing(false);
       setIsPickerMuted(false);
-      openColorPicker();
+      setShowColorPicker(false);
+      setShouldRenderColorPicker(false);
+      setButtonState(BUTTON_STATES.CUSTOMIZE);
+      textRotateRef.current?.next(); // Trigger animation
     }
   };
 
@@ -440,15 +469,33 @@ export default function ProfilePage() {
           )}
         </CardContent>
         <CardFooter className="flex justify-between">
-          {isEditing ? (
-            <Button onClick={handleCustomizeButtonClick}>
-              Done
-            </Button>
-          ) : (
-            <Button onClick={handleCustomizeButtonClick}>
-              {shouldRenderColorPicker ? 'Edit Information' : 'Customize'}
-            </Button>
-          )}
+          <LayoutGroup>
+            <motion.div layout>
+              <Button 
+                onClick={handleCustomizeButtonClick}
+                className="hover:opacity-90 transition-opacity"
+                style={{ 
+                  backgroundColor: `color-mix(in srgb, ${selectedColor} 70%, white 30%)` 
+                }}
+              >
+                <TextRotate
+                  ref={textRotateRef}
+                  texts={[BUTTON_STATES.CUSTOMIZE, BUTTON_STATES.EDIT, BUTTON_STATES.DONE]}
+                  mainClassName="px-2 overflow-hidden whitespace-nowrap text-white"
+                  staggerFrom="last"
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "-120%" }}
+                  staggerDuration={0.025}
+                  splitLevelClassName="overflow-hidden"
+                  transition={{ type: "spring", damping: 30, stiffness: 400 }}
+                  splitBy="characters"
+                  auto={false}
+                  loop={true}
+                />
+              </Button>
+            </motion.div>
+          </LayoutGroup>
         </CardFooter>
       </Card>
 

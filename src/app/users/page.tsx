@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Home, Mail, Phone } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 import { Button } from "@/components/ui/button";
+import { getAuth } from 'firebase/auth';
 
 interface Resident {
   id: string;
@@ -25,9 +26,10 @@ export default function DirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [residents, setResidents] = useState<Resident[]>([]);
+  const [userColor, setUserColor] = useState('#00BFFF');
 
   useEffect(() => {
-    const fetchResidents = async () => {
+    const fetchData = async () => {
       const usersRef = collection(db, 'users');
       const snapshot = await getDocs(usersRef);
       
@@ -41,9 +43,18 @@ export default function DirectoryPage() {
       }));
 
       setResidents(residentsData);
+
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          setUserColor(userDoc.data().cardColor || '#00BFFF');
+        }
+      }
     };
 
-    fetchResidents();
+    fetchData();
   }, []);
 
   const filteredAndSortedResidents = residents
@@ -119,7 +130,9 @@ export default function DirectoryPage() {
                         </div>
                         <div className="flex justify-end mt-2 space-x-2">
                           <a href={`https://api.whatsapp.com/send?phone=${resident.phone}`} target="_blank" rel="noopener noreferrer">
-                            <Button className="bg-green-500 text-white">WhatsApp</Button>
+                            <Button className="text-white hover:opacity-90" style={{ backgroundColor: userColor }}>
+                              WhatsApp
+                            </Button>
                           </a>
                           <a href={`/users/${resident.id}`}>
                             <Button variant="outline">View Profile</Button>
